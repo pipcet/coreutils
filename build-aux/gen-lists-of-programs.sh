@@ -110,7 +110,6 @@ normal_progs='
     shred
     shuf
     sleep
-    sort
     split
     stat
     sum
