@@ -1,3 +1,4 @@
 [submodule "gnulib"]
-        path = gnulib
-        url = git://git.sv.gnu.org/gnulib.git
+	path = gnulib
+	url = https://github.com/pipcet/gnulib
+        branch = asmjs
