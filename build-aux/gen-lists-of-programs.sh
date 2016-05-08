@@ -27,7 +27,6 @@ build_if_possible_progs='
     chroot
     df
     hostid
-    libstdbuf.so
     nice
     pinky
     stdbuf

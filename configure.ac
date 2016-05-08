@@ -506,7 +506,6 @@ m4_include([m4/cu-progs.m4])
 # Note it adding to pkglibexec_PROGRAMS, $(transform) in src/local.mk
 # may need to be updated accordingly.
 case " $optional_bin_progs " in
-  *' stdbuf '*) pkglibexec_PROGRAMS='src/libstdbuf.so';;
   *) pkglibexec_PROGRAMS='';;
 esac
 
