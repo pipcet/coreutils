@@ -12,6 +12,9 @@ GNU coreutils NEWS                                    -*- outline -*-
    System V style platforms where this information is available only
    in the global variable 'tzname'. [bug introduced in coreutils-8.24]
 
+   nl now resets numbering for each page section rather than just for each page.
+   [This bug was present in "the beginning".]
+
    stty --help no longer outputs extraneous gettext header lines
    for translated languages. [bug introduced in coreutils-8.24]
 
@@ -34,9 +37,10 @@ GNU coreutils NEWS                                    -*- outline -*-
 ** Improvements
 
    stat and tail now know about "prl_fs" (a parallels file system),
-   "m1fs" (a Plexistor file system), and "wslfs" (Windows Subsystem for Linux).
-   stat -f --format=%T now reports the file system type, and tail -f uses
-   polling for "prl_fs", inotify for "m1fs", and attempts inotify for "wslfs".
+   "m1fs" (a Plexistor file system), "wslfs" (Windows Subsystem for Linux),
+   and "smb2".  stat -f --format=%T now reports the file system type, and
+   tail -f uses polling for "prl_fs" and "smb2", inotify for "m1fs",
+   and attempts inotify for "wslfs".
 
 
 * Noteworthy changes in release 8.25 (2016-01-20) [stable]
