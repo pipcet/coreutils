@@ -24,6 +24,7 @@
 #include "system.h"
 
 #include "error.h"
+#include "full-write.h"
 #include "long-options.h"
 
 /* The official name of this program (e.g., no 'g' prefix).  */
@@ -58,10 +59,6 @@ Repeatedly output a line with all specified STRING(s), or 'y'.\n\
 int
 main (int argc, char **argv)
 {
-  char buf[BUFSIZ];
-  char *pbuf = buf;
-  int i;
-
   initialize_main (&argc, &argv);
   set_program_name (argv[0]);
   setlocale (LC_ALL, "");
@@ -75,62 +72,57 @@ main (int argc, char **argv)
   if (getopt_long (argc, argv, "+", NULL, NULL) != -1)
     usage (EXIT_FAILURE);
 
-  if (argc <= optind)
-    {
-      optind = argc;
-      argv[argc++] = bad_cast ("y");
-    }
+  char **operands = argv + optind;
+  char **operand_lim = argv + argc;
+  if (optind == argc)
+    *operand_lim++ = bad_cast ("y");
 
   /* Buffer data locally once, rather than having the
      large overhead of stdio buffering each item.  */
-  for (i = optind; i < argc; i++)
+  size_t bufalloc = 0;
+  bool reuse_operand_strings = true;
+  for (char **operandp = operands; operandp < operand_lim; operandp++)
     {
-      size_t len = strlen (argv[i]);
-      if (BUFSIZ < len || BUFSIZ - len <= pbuf - buf)
-        break;
-      memcpy (pbuf, argv[i], len);
-      pbuf += len;
-      *pbuf++ = i == argc - 1 ? '\n' : ' ';
-    }
-  if (i == argc)
-    {
-      size_t line_len = pbuf - buf;
-      size_t lines = BUFSIZ / line_len;
-      while (--lines)
-        {
-          memcpy (pbuf, pbuf - line_len, line_len);
-          pbuf += line_len;
-        }
+      size_t operand_len = strlen (*operandp);
+      bufalloc += operand_len + 1;
+      if (operandp + 1 < operand_lim
+          && *operandp + operand_len + 1 != operandp[1])
+        reuse_operand_strings = false;
     }
 
-  /* The normal case is to continuously output the local buffer.  */
-  while (i == argc)
+  /* Improve performance by using a buffer size greater than BUFSIZ / 2.  */
+  if (bufalloc <= BUFSIZ / 2)
     {
-      if (write (STDOUT_FILENO, buf, pbuf - buf) == -1)
-        {
-          error (0, errno, _("standard output"));
-          return EXIT_FAILURE;
-        }
+      bufalloc = BUFSIZ;
+      reuse_operand_strings = false;
     }
 
-  /* If the data doesn't fit in BUFSIZ then output
-     what we've buffered, and iterate over the remaining items.  */
-  while (true /* i != argc */)
+  /* Fill the buffer with one copy of the output.  If possible, reuse
+     the operands strings; this wins when the buffer would be large.  */
+  char *buf = reuse_operand_strings ? *operands : xmalloc (bufalloc);
+  size_t bufused = 0;
+  for (char **operandp = operands; operandp < operand_lim; operandp++)
     {
-      int j;
-      if ((pbuf - buf) && fwrite (buf, pbuf - buf, 1, stdout) != 1)
-        {
-          error (0, errno, _("standard output"));
-          clearerr (stdout);
-          return EXIT_FAILURE;
-        }
-      for (j = i; j < argc; j++)
-        if (fputs (argv[j], stdout) == EOF
-            || putchar (j == argc - 1 ? '\n' : ' ') == EOF)
-          {
-            error (0, errno, _("standard output"));
-            clearerr (stdout);
-            return EXIT_FAILURE;
-          }
+      size_t operand_len = strlen (*operandp);
+      if (! reuse_operand_strings)
+        memcpy (buf + bufused, *operandp, operand_len);
+      bufused += operand_len;
+      buf[bufused++] = ' ';
     }
+  buf[bufused - 1] = '\n';
+
+  /* If a larger buffer was allocated, fill it by repeating the buffer
+     contents.  */
+  size_t copysize = bufused;
+  for (size_t copies = bufalloc / copysize; --copies; )
+    {
+      memcpy (buf + bufused, buf, copysize);
+      bufused += copysize;
+    }
+
+  /* Repeatedly output the buffer until there is a write error; then fail.  */
+  while (full_write (STDOUT_FILENO, buf, bufused) == bufused)
+    continue;
+  error (0, errno, _("standard output"));
+  return EXIT_FAILURE;
 }
