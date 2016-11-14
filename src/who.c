@@ -26,6 +26,7 @@
 #include <config.h>
 #include <getopt.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include <sys/types.h>
 #include "system.h"
@@ -33,6 +34,7 @@
 #include "c-ctype.h"
 #include "canon-host.h"
 #include "readutmp.h"
+#include "die.h"
 #include "error.h"
 #include "hard-locale.h"
 #include "quote.h"
@@ -95,8 +97,6 @@
 #else
 # define UT_ID(U) "??"
 #endif
-
-char *ttyname (int);
 
 /* If true, attempt to canonicalize hostnames via a DNS lookup. */
 static bool do_lookup;
@@ -200,6 +200,9 @@ idle_string (time_t when, time_t boottime)
       else
         {
           static char idle_hhmm[IDLESTR_LEN];
+          /* FIXME-in-2018: see if this assert is still required in order
+             to suppress gcc's unwarranted -Wformat-length= warning.  */
+          assert (seconds_idle / (60 * 60) < 24);
           sprintf (idle_hhmm, "%02d:%02d",
                    seconds_idle / (60 * 60),
                    (seconds_idle % (60 * 60)) / 60);
@@ -620,7 +623,7 @@ who (const char *filename, int options)
   STRUCT_UTMP *utmp_buf;
 
   if (read_utmp (filename, &n_users, &utmp_buf, options) != 0)
-    error (EXIT_FAILURE, errno, "%s", quotef (filename));
+    die (EXIT_FAILURE, errno, "%s", quotef (filename));
 
   if (short_list)
     list_entries_who (n_users, utmp_buf);

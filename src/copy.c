@@ -38,6 +38,7 @@
 #include "copy.h"
 #include "cp-hash.h"
 #include "extent-scan.h"
+#include "die.h"
 #include "error.h"
 #include "fadvise.h"
 #include "fcntl--.h"
@@ -72,6 +73,14 @@
 
 #if HAVE_LINUX_FALLOC_H
 # include <linux/falloc.h>
+#endif
+
+#ifdef HAVE_LINUX_FS_H
+# include <linux/fs.h>
+#endif
+
+#if !defined FICLONE && defined __linux__
+# define FICLONE _IOW (0x94, 9, int)
 #endif
 
 #ifndef HAVE_FCHOWN
@@ -320,12 +329,8 @@ sparse_copy (int src_fd, int dest_fd, char *buf, size_t buf_size,
 static inline int
 clone_file (int dest_fd, int src_fd)
 {
-#ifdef __linux__
-# undef BTRFS_IOCTL_MAGIC
-# define BTRFS_IOCTL_MAGIC 0x94
-# undef BTRFS_IOC_CLONE
-# define BTRFS_IOC_CLONE _IOW (BTRFS_IOCTL_MAGIC, 9, int)
-  return ioctl (dest_fd, BTRFS_IOC_CLONE, src_fd);
+#ifdef FICLONE
+  return ioctl (dest_fd, FICLONE, src_fd);
 #else
   (void) dest_fd;
   (void) src_fd;
@@ -1758,8 +1763,8 @@ static void
 restore_default_fscreatecon_or_die (void)
 {
   if (setfscreatecon (NULL) != 0)
-    error (EXIT_FAILURE, errno,
-           _("failed to restore the default file creation context"));
+    die (EXIT_FAILURE, errno,
+         _("failed to restore the default file creation context"));
 }
 
 /* Create a hard link DST_NAME to SRC_NAME, honoring the REPLACE, VERBOSE and

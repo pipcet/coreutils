@@ -25,6 +25,7 @@
 #include <getopt.h>
 
 #include "system.h"
+#include "die.h"
 #include "error.h"
 #include "long-options.h"
 #include "quote.h"
@@ -84,8 +85,8 @@ main (int argc, char **argv)
   uid = geteuid ();
   pw = (uid == NO_UID && errno ? NULL : getpwuid (uid));
   if (!pw)
-    error (EXIT_FAILURE, errno, _("cannot find name for user ID %lu"),
-           (unsigned long int) uid);
+    die (EXIT_FAILURE, errno, _("cannot find name for user ID %lu"),
+         (unsigned long int) uid);
   puts (pw->pw_name);
   return EXIT_SUCCESS;
 }

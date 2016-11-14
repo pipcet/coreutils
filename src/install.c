@@ -31,6 +31,7 @@
 #include "error.h"
 #include "cp-hash.h"
 #include "copy.h"
+#include "die.h"
 #include "filenamecat.h"
 #include "full-read.h"
 #include "mkancesdirs.h"
@@ -39,6 +40,7 @@
 #include "prog-fprintf.h"
 #include "quote.h"
 #include "savewd.h"
+#include "selinux.h"
 #include "stat-time.h"
 #include "utimens.h"
 #include "xstrtol.h"
@@ -401,10 +403,10 @@ target_directory_operand (char const *file)
   int err = (stat (file, &st) == 0 ? 0 : errno);
   bool is_a_dir = !err && S_ISDIR (st.st_mode);
   if (err && err != ENOENT)
-    error (EXIT_FAILURE, err, _("failed to access %s"), quoteaf (file));
+    die (EXIT_FAILURE, err, _("failed to access %s"), quoteaf (file));
   if (is_a_dir < looks_like_a_dir)
-    error (EXIT_FAILURE, err, _("target %s is not a directory"),
-           quoteaf (file));
+    die (EXIT_FAILURE, err, _("target %s is not a directory"),
+         quoteaf (file));
   return is_a_dir;
 }
 
@@ -423,6 +425,12 @@ announce_mkdir (char const *dir, void *options)
 static int
 make_ancestor (char const *dir, char const *component, void *options)
 {
+  struct cp_options const *x = options;
+  if (x->set_security_context && defaultcon (dir, S_IFDIR) < 0
+      && ! ignorable_ctx_err (errno))
+    error (0, errno, _("failed to set default creation context for %s"),
+           quoteaf (dir));
+
   int r = mkdir (component, DEFAULT_MODE);
   if (r == 0)
     announce_mkdir (dir, options);
@@ -433,12 +441,28 @@ make_ancestor (char const *dir, char const *component, void *options)
 static int
 process_dir (char *dir, struct savewd *wd, void *options)
 {
-  return (make_dir_parents (dir, wd,
-                            make_ancestor, options,
-                            dir_mode, announce_mkdir,
-                            dir_mode_bits, owner_id, group_id, false)
+  struct cp_options const *x = options;
+
+  int ret = (make_dir_parents (dir, wd, make_ancestor, options,
+                               dir_mode, announce_mkdir,
+                               dir_mode_bits, owner_id, group_id, false)
           ? EXIT_SUCCESS
           : EXIT_FAILURE);
+
+  /* FIXME: Due to the current structure of make_dir_parents()
+     we don't have the facility to call defaultcon() before the
+     final component of DIR is created.  So for now, create the
+     final component with the context from previous component
+     and here we set the context for the final component. */
+  if (ret == EXIT_SUCCESS && x->set_security_context)
+    {
+      if (! restorecon (last_component (dir), false, false)
+          && ! ignorable_ctx_err (errno))
+        error (0, errno, _("failed to restore context for %s"),
+               quoteaf (dir));
+    }
+
+  return ret;
 }
 
 /* Copy file FROM onto file TO, creating TO if necessary.
@@ -532,8 +556,7 @@ strip (char const *name)
       break;
     case 0:			/* Child. */
       execlp (strip_program, strip_program, name, NULL);
-      error (EXIT_FAILURE, errno, _("cannot run %s"), quoteaf (strip_program));
-      break;
+      die (EXIT_FAILURE, errno, _("cannot run %s"), quoteaf (strip_program));
     default:			/* Parent. */
       if (waitpid (pid, &status, 0) < 0)
         error (0, errno, _("waiting for strip"));
@@ -562,8 +585,8 @@ get_ids (void)
           unsigned long int tmp;
           if (xstrtoul (owner_name, NULL, 0, &tmp, NULL) != LONGINT_OK
               || UID_T_MAX < tmp)
-            error (EXIT_FAILURE, 0, _("invalid user %s"),
-                   quote (owner_name));
+            die (EXIT_FAILURE, 0, _("invalid user %s"),
+                 quote (owner_name));
           owner_id = tmp;
         }
       else
@@ -581,8 +604,8 @@ get_ids (void)
           unsigned long int tmp;
           if (xstrtoul (group_name, NULL, 0, &tmp, NULL) != LONGINT_OK
               || GID_T_MAX < tmp)
-            error (EXIT_FAILURE, 0, _("invalid group %s"),
-                   quote (group_name));
+            die (EXIT_FAILURE, 0, _("invalid group %s"),
+                 quote (group_name));
           group_id = tmp;
         }
       else
@@ -651,26 +674,14 @@ In the 4th form, create all components of the given DIRECTORY(ies).\n\
       fputs (_("\
       --preserve-context  preserve SELinux security context\n\
   -Z                      set SELinux security context of destination\n\
-                            file to default type\n\
+                            file and each created directory to default type\n\
       --context[=CTX]     like -Z, or if CTX is specified then set the\n\
                             SELinux or SMACK security context to CTX\n\
 "), stdout);
 
       fputs (HELP_OPTION_DESCRIPTION, stdout);
       fputs (VERSION_OPTION_DESCRIPTION, stdout);
-      fputs (_("\
-\n\
-The backup suffix is '~', unless set with --suffix or SIMPLE_BACKUP_SUFFIX.\n\
-The version control method may be selected via the --backup option or through\n\
-the VERSION_CONTROL environment variable.  Here are the values:\n\
-\n\
-"), stdout);
-      fputs (_("\
-  none, off       never make backups (even if --backup is given)\n\
-  numbered, t     make numbered backups\n\
-  existing, nil   numbered if numbered backups exist, simple otherwise\n\
-  simple, never   always make simple backups\n\
-"), stdout);
+      emit_backup_suffix_note ();
       emit_ancillary_info (PROGRAM_NAME);
     }
   exit (status);
@@ -696,7 +707,7 @@ install_file_in_file (const char *from, const char *to,
     if (! strip (to))
       {
         if (unlink (to) != 0)  /* Cleanup.  */
-          error (EXIT_FAILURE, errno, _("cannot unlink %s"), quoteaf (to));
+          die (EXIT_FAILURE, errno, _("cannot unlink %s"), quoteaf (to));
         return false;
       }
   if (x->preserve_timestamps && (strip_files || ! S_ISREG (from_sb.st_mode))
@@ -784,7 +795,6 @@ main (int argc, char **argv)
   int exit_status = EXIT_SUCCESS;
   const char *specified_mode = NULL;
   bool make_backups = false;
-  char *backup_suffix_string;
   char *version_control_string = NULL;
   bool mkdir_and_install = false;
   struct cp_options x;
@@ -812,10 +822,6 @@ main (int argc, char **argv)
   strip_files = false;
   dir_arg = false;
   umask (0);
-
-  /* FIXME: consider not calling getenv for SIMPLE_BACKUP_SUFFIX unless
-     we'll actually use backup_suffix_string.  */
-  backup_suffix_string = getenv ("SIMPLE_BACKUP_SUFFIX");
 
   while ((optc = getopt_long (argc, argv, "bcCsDdg:m:o:pt:TvS:Z", long_options,
                               NULL)) != -1)
@@ -866,12 +872,12 @@ main (int argc, char **argv)
           break;
         case 'S':
           make_backups = true;
-          backup_suffix_string = optarg;
+          simple_backup_suffix = optarg;
           break;
         case 't':
           if (target_directory)
-            error (EXIT_FAILURE, 0,
-                   _("multiple target directories specified"));
+            die (EXIT_FAILURE, 0,
+                 _("multiple target directories specified"));
           target_directory = optarg;
           break;
         case 'T':
@@ -920,26 +926,23 @@ main (int argc, char **argv)
 
   /* Check for invalid combinations of arguments. */
   if (dir_arg && strip_files)
-    error (EXIT_FAILURE, 0,
-           _("the strip option may not be used when installing a directory"));
+    die (EXIT_FAILURE, 0,
+         _("the strip option may not be used when installing a directory"));
   if (dir_arg && target_directory)
-    error (EXIT_FAILURE, 0,
-           _("target directory not allowed when installing a directory"));
+    die (EXIT_FAILURE, 0,
+         _("target directory not allowed when installing a directory"));
 
   if (target_directory)
     {
       struct stat st;
       bool stat_success = stat (target_directory, &st) == 0 ? true : false;
       if (! mkdir_and_install && ! stat_success)
-        error (EXIT_FAILURE, errno, _("failed to access %s"),
-               quoteaf (target_directory));
+        die (EXIT_FAILURE, errno, _("failed to access %s"),
+             quoteaf (target_directory));
       if (stat_success && ! S_ISDIR (st.st_mode))
-        error (EXIT_FAILURE, 0, _("target %s is not a directory"),
-               quoteaf (target_directory));
+        die (EXIT_FAILURE, 0, _("target %s is not a directory"),
+             quoteaf (target_directory));
     }
-
-  if (backup_suffix_string)
-    simple_backup_suffix = xstrdup (backup_suffix_string);
 
   x.backup_type = (make_backups
                    ? xget_version (_("backup type"),
@@ -947,13 +950,13 @@ main (int argc, char **argv)
                    : no_backups);
 
   if (x.preserve_security_context && (x.set_security_context || scontext))
-    error (EXIT_FAILURE, 0,
-           _("cannot set target context and preserve it"));
+    die (EXIT_FAILURE, 0,
+         _("cannot set target context and preserve it"));
 
   if (scontext && setfscreatecon (se_const (scontext)) < 0)
-    error (EXIT_FAILURE, errno,
-           _("failed to set default file creation context to %s"),
-           quote (scontext));
+    die (EXIT_FAILURE, errno,
+         _("failed to set default file creation context to %s"),
+         quote (scontext));
 
   n_files = argc - optind;
   file = argv + optind;
@@ -971,9 +974,9 @@ main (int argc, char **argv)
   if (no_target_directory)
     {
       if (target_directory)
-        error (EXIT_FAILURE, 0,
-               _("cannot combine --target-directory (-t) "
-                 "and --no-target-directory (-T)"));
+        die (EXIT_FAILURE, 0,
+             _("cannot combine --target-directory (-t) "
+               "and --no-target-directory (-T)"));
       if (2 < n_files)
         {
           error (0, 0, _("extra operand %s"), quoteaf (file[2]));
@@ -985,15 +988,15 @@ main (int argc, char **argv)
       if (2 <= n_files && target_directory_operand (file[n_files - 1]))
         target_directory = file[--n_files];
       else if (2 < n_files)
-        error (EXIT_FAILURE, 0, _("target %s is not a directory"),
-               quoteaf (file[n_files - 1]));
+        die (EXIT_FAILURE, 0, _("target %s is not a directory"),
+             quoteaf (file[n_files - 1]));
     }
 
   if (specified_mode)
     {
       struct mode_change *change = mode_compile (specified_mode);
       if (!change)
-        error (EXIT_FAILURE, 0, _("invalid mode %s"), quote (specified_mode));
+        die (EXIT_FAILURE, 0, _("invalid mode %s"), quote (specified_mode));
       mode = mode_adjust (0, false, 0, change, NULL);
       dir_mode = mode_adjust (0, true, 0, change, &dir_mode_bits);
       free (change);

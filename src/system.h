@@ -197,23 +197,23 @@ select_plural (uintmax_t n)
 #define STRNCMP_LIT(s, lit) strncmp (s, "" lit "", sizeof (lit) - 1)
 
 #if !HAVE_DECL_GETLOGIN
-char *getlogin ();
+char *getlogin (void);
 #endif
 
 #if !HAVE_DECL_TTYNAME
-char *ttyname ();
+char *ttyname (int);
 #endif
 
 #if !HAVE_DECL_GETEUID
-uid_t geteuid ();
+uid_t geteuid (void);
 #endif
 
 #if !HAVE_DECL_GETPWUID
-struct passwd *getpwuid ();
+struct passwd *getpwuid (uid_t);
 #endif
 
 #if !HAVE_DECL_GETGRGID
-struct group *getgrgid ();
+struct group *getgrgid (gid_t);
 #endif
 
 /* Interix has replacements for getgr{gid,nam,ent}, that don't
@@ -235,7 +235,7 @@ struct group *getgrgid ();
 #endif
 
 #if !HAVE_DECL_GETUID
-uid_t getuid ();
+uid_t getuid (void);
 #endif
 
 #include "xalloc.h"
@@ -606,6 +606,24 @@ Display values are in units of the first available SIZE from --block-size,\n\
 and the %s_BLOCK_SIZE, BLOCK_SIZE and BLOCKSIZE environment variables.\n\
 Otherwise, units default to 1024 bytes (or 512 if POSIXLY_CORRECT is set).\n\
 "), program);
+}
+
+static inline void
+emit_backup_suffix_note (void)
+{
+  fputs (_("\
+\n\
+The backup suffix is '~', unless set with --suffix or SIMPLE_BACKUP_SUFFIX.\n\
+The version control method may be selected via the --backup option or through\n\
+the VERSION_CONTROL environment variable.  Here are the values:\n\
+\n\
+"), stdout);
+  fputs (_("\
+  none, off       never make backups (even if --backup is given)\n\
+  numbered, t     make numbered backups\n\
+  existing, nil   numbered if numbered backups exist, simple otherwise\n\
+  simple, never   always make simple backups\n\
+"), stdout);
 }
 
 static inline void

@@ -34,6 +34,7 @@
 #include "system.h"
 #include "argmatch.h"
 #include "c-strtod.h"
+#include "die.h"
 #include "error.h"
 #include "fcntl--.h"
 #include "isapipe.h"
@@ -387,8 +388,8 @@ xwrite_stdout (char const *buffer, size_t n_bytes)
   if (n_bytes > 0 && fwrite (buffer, 1, n_bytes, stdout) < n_bytes)
     {
       clearerr (stdout); /* To avoid redundant close_stdout diagnostic.  */
-      error (EXIT_FAILURE, errno, _("error writing %s"),
-             quoteaf ("standard output"));
+      die (EXIT_FAILURE, errno, _("error writing %s"),
+           quoteaf ("standard output"));
     }
 }
 
@@ -412,8 +413,8 @@ dump_remainder (const char *pretty_filename, int fd, uintmax_t n_bytes)
       if (bytes_read == SAFE_READ_ERROR)
         {
           if (errno != EAGAIN)
-            error (EXIT_FAILURE, errno, _("error reading %s"),
-                   quoteaf (pretty_filename));
+            die (EXIT_FAILURE, errno, _("error reading %s"),
+                 quoteaf (pretty_filename));
           break;
         }
       if (bytes_read == 0)
@@ -956,8 +957,8 @@ recheck (struct File_spec *f, bool blocking)
       f->errnum = -1;
       f->ignore = true;
 
-      error (0, 0, _("%s has been replaced with a symbolic link. "
-                     "giving up on this name"), quoteaf (pretty_name (f)));
+      error (0, 0, _("%s has been replaced with an untailable symbolic link"),
+             quoteaf (pretty_name (f)));
     }
   else if (fd == -1 || fstat (fd, &new_stats) < 0)
     {
@@ -986,17 +987,20 @@ recheck (struct File_spec *f, bool blocking)
     {
       ok = false;
       f->errnum = -1;
-      error (0, 0, _("%s has been replaced with an untailable file;\
- giving up on this name"),
-             quoteaf (pretty_name (f)));
-      f->ignore = true;
+      f->tailable = false;
+      if (! (reopen_inaccessible_files && follow_mode == Follow_name))
+        f->ignore = true;
+      if (was_tailable || prev_errnum != f->errnum)
+        error (0, 0, _("%s has been replaced with an untailable file%s"),
+               quoteaf (pretty_name (f)),
+               f->ignore ? _("; giving up on this name") : "");
     }
   else if (!disable_inotify && fremote (fd, pretty_name (f)))
     {
       ok = false;
       f->errnum = -1;
-      error (0, 0, _("%s has been replaced with a remote file. "
-                     "giving up on this name"), quoteaf (pretty_name (f)));
+      error (0, 0, _("%s has been replaced with an untailable remote file"),
+             quoteaf (pretty_name (f)));
       f->ignore = true;
       f->remote = true;
     }
@@ -1075,20 +1079,20 @@ any_live_files (const struct File_spec *f, size_t n_files)
 {
   size_t i;
 
+  /* In inotify mode, ignore may be set for files
+     which may later be replaced with new files.
+     So always consider files live in -F mode.  */
   if (reopen_inaccessible_files && follow_mode == Follow_name)
-    return true;  /* continue following for -F option */
+    return true;
 
   for (i = 0; i < n_files; i++)
     {
       if (0 <= f[i].fd)
-        {
-          return true;
-        }
+        return true;
       else
         {
-          if (reopen_inaccessible_files && follow_mode == Follow_descriptor)
-            if (! f[i].ignore)
-              return true;
+          if (! f[i].ignore && reopen_inaccessible_files)
+            return true;
         }
     }
 
@@ -1107,7 +1111,7 @@ tail_forever (struct File_spec *f, size_t n_files, double sleep_interval)
 {
   /* Use blocking I/O as an optimization, when it's easy.  */
   bool blocking = (pid == 0 && follow_mode == Follow_descriptor
-                   && n_files == 1 && ! S_ISREG (f[0].mode));
+                   && n_files == 1 && f[0].fd != -1 && ! S_ISREG (f[0].mode));
   size_t last;
   bool writer_is_dead = false;
 
@@ -1154,9 +1158,9 @@ tail_forever (struct File_spec *f, size_t n_files, double sleep_interval)
                          the append-only attribute.  */
                     }
                   else
-                    error (EXIT_FAILURE, errno,
-                           _("%s: cannot change nonblocking mode"),
-                           quotef (name));
+                    die (EXIT_FAILURE, errno,
+                         _("%s: cannot change nonblocking mode"),
+                         quotef (name));
                 }
               else
                 f[i].blocking = blocking;
@@ -1216,9 +1220,19 @@ tail_forever (struct File_spec *f, size_t n_files, double sleep_interval)
                 }
             }
 
-          bytes_read = dump_remainder (name, fd,
-                                       (f[i].blocking
-                                        ? COPY_A_BUFFER : COPY_TO_EOF));
+          /* Don't read more than st_size on networked file systems
+             because it was seen on glusterfs at least, that st_size
+             may be smaller than the data read on a _subsequent_ stat call.  */
+          uintmax_t bytes_to_read;
+          if (f[i].blocking)
+            bytes_to_read = COPY_A_BUFFER;
+          else if (S_ISREG (mode) && f[i].remote)
+            bytes_to_read = stats.st_size - f[i].size;
+          else
+            bytes_to_read = COPY_TO_EOF;
+
+          bytes_read = dump_remainder (name, fd, bytes_to_read);
+
           any_input |= (bytes_read != 0);
           f[i].size += bytes_read;
         }
@@ -1230,7 +1244,7 @@ tail_forever (struct File_spec *f, size_t n_files, double sleep_interval)
         }
 
       if ((!any_input || blocking) && fflush (stdout) != 0)
-        error (EXIT_FAILURE, errno, _("write error"));
+        die (EXIT_FAILURE, errno, _("write error"));
 
       /* If nothing was read, sleep and/or check for dead writers.  */
       if (!any_input)
@@ -1248,7 +1262,7 @@ tail_forever (struct File_spec *f, size_t n_files, double sleep_interval)
                             && errno != EPERM);
 
           if (!writer_is_dead && xnanosleep (sleep_interval))
-            error (EXIT_FAILURE, errno, _("cannot read realtime clock"));
+            die (EXIT_FAILURE, errno, _("cannot read realtime clock"));
 
         }
     }
@@ -1376,7 +1390,7 @@ check_fspec (struct File_spec *fspec, struct File_spec **prev_fspec)
   fspec->size += bytes_read;
 
   if (fflush (stdout) != 0)
-    error (EXIT_FAILURE, errno, _("write error"));
+    die (EXIT_FAILURE, errno, _("write error"));
 }
 
 /* Attempt to tail N_FILES files forever, or until killed.
@@ -1588,7 +1602,7 @@ tail_forever_inotify (int wd, struct File_spec *f, size_t n_files,
            if (file_change == 0)
              continue;
            else if (file_change == -1)
-             error (EXIT_FAILURE, errno, _("error monitoring inotify event"));
+             die (EXIT_FAILURE, errno, _("error monitoring inotify event"));
         }
 
       if (len <= evbuf_off)
@@ -1608,7 +1622,7 @@ tail_forever_inotify (int wd, struct File_spec *f, size_t n_files,
             }
 
           if (len == 0 || len == SAFE_READ_ERROR)
-            error (EXIT_FAILURE, errno, _("error reading inotify event"));
+            die (EXIT_FAILURE, errno, _("error reading inotify event"));
         }
 
       void_ev = evbuf + evbuf_off;
@@ -1895,7 +1909,7 @@ tail_file (struct File_spec *f, uintmax_t n_units)
         {
           f->fd = -1;
           f->errnum = errno;
-          f->ignore = false;
+          f->ignore = ! reopen_inaccessible_files;
           f->ino = 0;
           f->dev = 0;
         }
@@ -1930,12 +1944,14 @@ tail_file (struct File_spec *f, uintmax_t n_units)
             }
           else if (!IS_TAILABLE_FILE_TYPE (stats.st_mode))
             {
-              error (0, 0, _("%s: cannot follow end of this type of file;\
- giving up on this name"),
-                     quotef (pretty_name (f)));
               ok = false;
               f->errnum = -1;
-              f->ignore = true;
+              f->tailable = false;
+              f->ignore = ! (reopen_inaccessible_files
+                             && follow_mode == Follow_name);
+              error (0, 0, _("%s: cannot follow end of this type of file%s"),
+                     quotef (pretty_name (f)),
+                     f->ignore ? _("; giving up on this name") : "");
             }
 
           if (!ok)
@@ -2050,8 +2066,8 @@ parse_obsolete_option (int argc, char * const *argv, uintmax_t *n_units)
             & ~LONGINT_INVALID_SUFFIX_CHAR)
            != LONGINT_OK)
     {
-      error (EXIT_FAILURE, errno, "%s: %s", _("invalid number"),
-             quote (argv[1]));
+      die (EXIT_FAILURE, errno, "%s: %s", _("invalid number"),
+           quote (argv[1]));
     }
 
   /* Set globals.  */
@@ -2136,8 +2152,8 @@ parse_options (int argc, char **argv,
           {
             double s;
             if (! (xstrtod (optarg, NULL, &s, c_strtod) && 0 <= s))
-              error (EXIT_FAILURE, 0,
-                     _("invalid number of seconds: %s"), quote (optarg));
+              die (EXIT_FAILURE, 0,
+                   _("invalid number of seconds: %s"), quote (optarg));
             *sleep_interval = s;
           }
           break;
@@ -2156,8 +2172,7 @@ parse_options (int argc, char **argv,
 
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
-          error (EXIT_FAILURE, 0,
-                 _("option used in invalid context -- %c"), c);
+          die (EXIT_FAILURE, 0, _("option used in invalid context -- %c"), c);
 
         default:
           usage (EXIT_FAILURE);
@@ -2207,7 +2222,10 @@ ignore_fifo_and_pipe (struct File_spec *f, size_t n_files)
          && (S_ISFIFO (f[i].mode)
              || (HAVE_FIFO_PIPES != 1 && isapipe (f[i].fd))));
       if (is_a_fifo_or_pipe)
-        f[i].ignore = true;
+        {
+          f[i].fd = -1;
+          f[i].ignore = true;
+        }
       else
         ++n_viable;
     }
@@ -2285,7 +2303,7 @@ main (int argc, char **argv)
 
     /* When following by name, there must be a name.  */
     if (found_hyphen && follow_mode == Follow_name)
-      error (EXIT_FAILURE, 0, _("cannot follow %s by name"), quoteaf ("-"));
+      die (EXIT_FAILURE, 0, _("cannot follow %s by name"), quoteaf ("-"));
 
     /* When following forever, warn if any file is '-'.
        This is only a warning, since tail's output (before a failing seek,
@@ -2373,7 +2391,7 @@ main (int argc, char **argv)
                  tail_forever_inotify flushes only after writing,
                  not before reading.  */
               if (fflush (stdout) != 0)
-                error (EXIT_FAILURE, errno, _("write error"));
+                die (EXIT_FAILURE, errno, _("write error"));
 
               if (! tail_forever_inotify (wd, F, n_files, sleep_interval))
                 return EXIT_FAILURE;
@@ -2401,6 +2419,6 @@ main (int argc, char **argv)
   IF_LINT (free (F));
 
   if (have_read_stdin && close (STDIN_FILENO) < 0)
-    error (EXIT_FAILURE, errno, "-");
+    die (EXIT_FAILURE, errno, "-");
   return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }

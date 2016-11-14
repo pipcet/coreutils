@@ -26,6 +26,7 @@
 
 #include "system.h"
 #include "argmatch.h"
+#include "die.h"
 #include "error.h"
 #include "parse-datetime.h"
 #include "posixtm.h"
@@ -78,7 +79,8 @@ static char const rfc_2822_format[] = "%a, %d %b %Y %H:%M:%S %z";
    non-character as a pseudo short option, starting with CHAR_MAX + 1.  */
 enum
 {
-  RFC_3339_OPTION = CHAR_MAX + 1
+  RFC_3339_OPTION = CHAR_MAX + 1,
+  DEBUG_DATE_PARSING
 };
 
 static char const short_options[] = "d:f:I::r:Rs:u";
@@ -86,6 +88,7 @@ static char const short_options[] = "d:f:I::r:Rs:u";
 static struct option const long_options[] =
 {
   {"date", required_argument, NULL, 'd'},
+  {"debug", no_argument, NULL, DEBUG_DATE_PARSING},
   {"file", required_argument, NULL, 'f'},
   {"iso-8601", optional_argument, NULL, 'I'},
   {"reference", required_argument, NULL, 'r'},
@@ -100,6 +103,9 @@ static struct option const long_options[] =
   {GETOPT_VERSION_OPTION_DECL},
   {NULL, 0, NULL, 0}
 };
+
+/* flags for parse_datetime2 */
+static unsigned int parse_datetime_flags;
 
 #if LOCALTIME_CACHE
 # define TZSET tzset ()
@@ -133,6 +139,12 @@ Display the current time in the given FORMAT, or set the system date.\n\
 
       fputs (_("\
   -d, --date=STRING          display time described by STRING, not 'now'\n\
+"), stdout);
+      fputs (_("\
+      --debug                annotate the parsed date,\n\
+                              and warn about questionable usage to stderr\n\
+"), stdout);
+      fputs (_("\
   -f, --file=DATEFILE        like --date; once for each line of DATEFILE\n\
 "), stdout);
       fputs (_("\
@@ -202,6 +214,7 @@ FORMAT controls the output.  Interpreted sequences are:\n\
   %N   nanoseconds (000000000..999999999)\n\
   %p   locale's equivalent of either AM or PM; blank if not known\n\
   %P   like %p, but lower case\n\
+  %q   quarter of year (1..4)\n\
   %r   locale's 12-hour clock time (e.g., 11:11:04 PM)\n\
   %R   24-hour hour and minute; same as %H:%M\n\
   %s   seconds since 1970-01-01 00:00:00 UTC\n\
@@ -290,7 +303,7 @@ batch_convert (const char *input_filename, const char *format, timezone_t tz)
       in_stream = fopen (input_filename, "r");
       if (in_stream == NULL)
         {
-          error (EXIT_FAILURE, errno, "%s", quotef (input_filename));
+          die (EXIT_FAILURE, errno, "%s", quotef (input_filename));
         }
     }
 
@@ -306,7 +319,7 @@ batch_convert (const char *input_filename, const char *format, timezone_t tz)
           break;
         }
 
-      if (! parse_datetime (&when, line, NULL))
+      if (! parse_datetime2 (&when, line, NULL, parse_datetime_flags))
         {
           if (line[line_length - 1] == '\n')
             line[line_length - 1] = '\0';
@@ -320,7 +333,7 @@ batch_convert (const char *input_filename, const char *format, timezone_t tz)
     }
 
   if (fclose (in_stream) == EOF)
-    error (EXIT_FAILURE, errno, "%s", quotef (input_filename));
+    die (EXIT_FAILURE, errno, "%s", quotef (input_filename));
 
   free (line);
 
@@ -359,6 +372,9 @@ main (int argc, char **argv)
         {
         case 'd':
           datestr = optarg;
+          break;
+        case DEBUG_DATE_PARSING:
+          parse_datetime_flags |= PARSE_DATETIME_DEBUG;
           break;
         case 'f':
           batch_file = optarg;
@@ -421,7 +437,7 @@ main (int argc, char **argv)
       if (new_format)
         {
           if (format)
-            error (EXIT_FAILURE, 0, _("multiple output formats specified"));
+            die (EXIT_FAILURE, 0, _("multiple output formats specified"));
           format = new_format;
         }
     }
@@ -455,7 +471,7 @@ main (int argc, char **argv)
       if (argv[optind][0] == '+')
         {
           if (format)
-            error (EXIT_FAILURE, 0, _("multiple output formats specified"));
+            die (EXIT_FAILURE, 0, _("multiple output formats specified"));
           format = argv[optind++] + 1;
         }
       else if (set_date || option_specified_date)
@@ -520,19 +536,20 @@ main (int argc, char **argv)
           if (reference != NULL)
             {
               if (stat (reference, &refstats) != 0)
-                error (EXIT_FAILURE, errno, "%s", quotef (reference));
+                die (EXIT_FAILURE, errno, "%s", quotef (reference));
               when = get_stat_mtime (&refstats);
             }
           else
             {
               if (set_datestr)
                 datestr = set_datestr;
-              valid_date = parse_datetime (&when, datestr, NULL);
+              valid_date = parse_datetime2 (&when, datestr, NULL,
+                                            parse_datetime_flags);
             }
         }
 
       if (! valid_date)
-        error (EXIT_FAILURE, 0, _("invalid date %s"), quote (datestr));
+        die (EXIT_FAILURE, 0, _("invalid date %s"), quote (datestr));
 
       if (set_date)
         {

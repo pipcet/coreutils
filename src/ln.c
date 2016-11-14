@@ -23,6 +23,7 @@
 
 #include "system.h"
 #include "backupfile.h"
+#include "die.h"
 #include "error.h"
 #include "filenamecat.h"
 #include "file-set.h"
@@ -129,10 +130,10 @@ target_directory_operand (char const *file)
   int err = (stat_result == 0 ? 0 : errno);
   bool is_a_dir = !err && S_ISDIR (st.st_mode);
   if (err && ! errno_nonexisting (errno))
-    error (EXIT_FAILURE, err, _("failed to access %s"), quoteaf (file));
+    die (EXIT_FAILURE, err, _("failed to access %s"), quoteaf (file));
   if (is_a_dir < looks_like_a_dir)
-    error (EXIT_FAILURE, err, _("target %s is not a directory"),
-           quoteaf (file));
+    die (EXIT_FAILURE, err, _("target %s is not a directory"),
+         quoteaf (file));
   return is_a_dir;
 }
 
@@ -435,19 +436,7 @@ interpreted in relation to its parent directory.\n\
 "), stdout);
       fputs (HELP_OPTION_DESCRIPTION, stdout);
       fputs (VERSION_OPTION_DESCRIPTION, stdout);
-      fputs (_("\
-\n\
-The backup suffix is '~', unless set with --suffix or SIMPLE_BACKUP_SUFFIX.\n\
-The version control method may be selected via the --backup option or through\n\
-the VERSION_CONTROL environment variable.  Here are the values:\n\
-\n\
-"), stdout);
-      fputs (_("\
-  none, off       never make backups (even if --backup is given)\n\
-  numbered, t     make numbered backups\n\
-  existing, nil   numbered if numbered backups exist, simple otherwise\n\
-  simple, never   always make simple backups\n\
-"), stdout);
+      emit_backup_suffix_note ();
       printf (_("\
 \n\
 Using -s ignores -L and -P.  Otherwise, the last option specified controls\n\
@@ -464,7 +453,6 @@ main (int argc, char **argv)
   int c;
   bool ok;
   bool make_backups = false;
-  char *backup_suffix_string;
   char *version_control_string = NULL;
   char const *target_directory = NULL;
   bool no_target_directory = false;
@@ -478,10 +466,6 @@ main (int argc, char **argv)
   textdomain (PACKAGE);
 
   atexit (close_stdin);
-
-  /* FIXME: consider not calling getenv for SIMPLE_BACKUP_SUFFIX unless
-     we'll actually use backup_suffix_string.  */
-  backup_suffix_string = getenv ("SIMPLE_BACKUP_SUFFIX");
 
   symbolic_link = remove_existing_files = interactive = verbose
     = hard_dir_link = false;
@@ -525,16 +509,16 @@ main (int argc, char **argv)
           break;
         case 't':
           if (target_directory)
-            error (EXIT_FAILURE, 0, _("multiple target directories specified"));
+            die (EXIT_FAILURE, 0, _("multiple target directories specified"));
           else
             {
               struct stat st;
               if (stat (optarg, &st) != 0)
-                error (EXIT_FAILURE, errno, _("failed to access %s"),
-                       quoteaf (optarg));
+                die (EXIT_FAILURE, errno, _("failed to access %s"),
+                     quoteaf (optarg));
               if (! S_ISDIR (st.st_mode))
-                error (EXIT_FAILURE, 0, _("target %s is not a directory"),
-                       quoteaf (optarg));
+                die (EXIT_FAILURE, 0, _("target %s is not a directory"),
+                     quoteaf (optarg));
             }
           target_directory = optarg;
           break;
@@ -546,7 +530,7 @@ main (int argc, char **argv)
           break;
         case 'S':
           make_backups = true;
-          backup_suffix_string = optarg;
+          simple_backup_suffix = optarg;
           break;
         case_GETOPT_HELP_CHAR;
         case_GETOPT_VERSION_CHAR (PROGRAM_NAME, AUTHORS);
@@ -568,9 +552,9 @@ main (int argc, char **argv)
   if (no_target_directory)
     {
       if (target_directory)
-        error (EXIT_FAILURE, 0,
-               _("cannot combine --target-directory "
-                 "and --no-target-directory"));
+        die (EXIT_FAILURE, 0,
+             _("cannot combine --target-directory "
+               "and --no-target-directory"));
       if (n_files != 2)
         {
           if (n_files < 2)
@@ -589,12 +573,9 @@ main (int argc, char **argv)
       else if (2 <= n_files && target_directory_operand (file[n_files - 1]))
         target_directory = file[--n_files];
       else if (2 < n_files)
-        error (EXIT_FAILURE, 0, _("target %s is not a directory"),
-               quoteaf (file[n_files - 1]));
+        die (EXIT_FAILURE, 0, _("target %s is not a directory"),
+             quoteaf (file[n_files - 1]));
     }
-
-  if (backup_suffix_string)
-    simple_backup_suffix = xstrdup (backup_suffix_string);
 
   backup_type = (make_backups
                  ? xget_version (_("backup type"), version_control_string)
@@ -602,8 +583,8 @@ main (int argc, char **argv)
 
   if (relative && !symbolic_link)
     {
-        error (EXIT_FAILURE, 0,
-               _("cannot do --relative without --symbolic"));
+        die (EXIT_FAILURE, 0,
+             _("cannot do --relative without --symbolic"));
     }
 
 

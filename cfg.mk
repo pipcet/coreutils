@@ -226,6 +226,16 @@ sc_error_shell_always_quotes:
 	       exit 1; }  \
 	  || :
 
+# Usage of error() with an exit constant, should instead use die(),
+# as that avoids warnings and may generate better code, due to being apparent
+# to the compiler that it doesn't return.
+sc_die_EXIT_FAILURE:
+	@cd $(srcdir)/src && GIT_PAGER= git grep -E \
+	    'error \(.*_(FAILURE|INVALID)' \
+	  && { echo '$(ME): '"Use die() instead of error" 1>&2; \
+	       exit 1; }  \
+	  || :
+
 # Avoid unstyled quoting to internal slots and thus destined for diagnostics
 # as that can leak unescaped control characters to the output, when using
 # the default "literal" quoting style.
@@ -251,7 +261,7 @@ au_dotdot = authors-dotdot
 au_actual = authors-actual
 sc_check-AUTHORS: $(all_programs)
 	@locale=en_US.UTF-8;				\
-	LC_ALL=$$locale ./src/cat --version		\
+	LC_ALL=$$locale ./src/factor --version		\
 	    | grep ' Torbjorn '	> /dev/null		\
 	  && { echo "$@: skipping this check"; exit 0; }; \
 	rm -f $(au_actual) $(au_dotdot);		\
@@ -424,14 +434,14 @@ sc_prohibit_stat_macro_address:
 	  $(_sc_search_regexp)
 
 # Ensure that date's --help output stays in sync with the info
-# documentation for GNU strftime.  The only exception is %N,
+# documentation for GNU strftime.  The only exception is %N and %q,
 # which date accepts but GNU strftime does not.
 extract_char = sed 's/^[^%][^%]*%\(.\).*/\1/'
 sc_strftime_check:
 	@if test -f $(srcdir)/src/date.c; then				\
 	  grep '^  %.  ' $(srcdir)/src/date.c | sort			\
 	    | $(extract_char) > $@-src;					\
-	  { echo N;							\
+	  { echo N; echo q;						\
 	    info libc date calendar format 2>/dev/null			\
 	      | grep "^ *['\`]%.'$$"| $(extract_char); }| sort >$@-info;\
 	  if test $$(stat --format %s $@-info) != 2; then		\
@@ -492,7 +502,7 @@ sc_prohibit_fail_0:
 # independently check its contents and thus detect any crash messages.
 sc_prohibit_and_fail_1:
 	@prohibit='&& fail=1'						\
-	exclude='(stat|kill|test |EGREP|grep|compare|2> *[^/])'		\
+	exclude='(returns_|stat|kill|test |EGREP|grep|compare|2> *[^/])' \
 	halt='&& fail=1 detected. Please use: returns_ 1 ... || fail=1'	\
 	in_vc_files='^tests/'						\
 	  $(_sc_search_regexp)
@@ -722,15 +732,22 @@ sc_THANKS_in_duplicates:
 	    && { echo '$(ME): remove the above names from THANKS.in'	\
 		  1>&2; exit 1; } || :
 
-# Ensure the contributor list stays sorted.  Use our sort as other
-# implementations may result in a different order.
-sc_THANKS_in_sorted:  src/sort
-	@sed '/^$$/,/^$$/!d;/^$$/d' $(srcdir)/THANKS.in > $@.1;		\
-	LC_ALL=en_US.UTF-8 src/sort -f -k1,1 $@.1 > $@.2
-	@diff -u $@.1 $@.2; diff=$$?;					\
-	rm -f $@.1 $@.2;						\
-	test "$$diff" = 0						\
-	  || { echo '$(ME): THANKS.in is unsorted' 1>&2; exit 1; }
+# Ensure the contributor list stays sorted.  However, if the system's
+# en_US.UTF-8 locale data is erroneous, give a diagnostic and skip
+# this test.  This affects OS X, up to at least 10.11.6.
+# Use our sort as other implementations may result in a different order.
+sc_THANKS_in_sorted:
+	@printf 'a\n.b\n'|LC_ALL=en_US.UTF-8 src/sort -c 2> /dev/null	\
+	  && {								\
+	    sed '/^$$/,/^$$/!d;/^$$/d' $(srcdir)/THANKS.in > $@.1 &&	\
+	    LC_ALL=en_US.UTF-8 src/sort -f -k1,1 $@.1 > $@.2 &&		\
+	    diff -u $@.1 $@.2; diff=$$?;				\
+	    rm -f $@.1 $@.2;						\
+	    test "$$diff" = 0						\
+	      || { echo '$(ME): THANKS.in is unsorted' 1>&2; exit 1; };	\
+	    }								\
+	  || { echo '$(ME): this system has erroneous locale data;'	\
+		    'skipping $@' 1>&2; }
 
 # Look for developer diagnostics that are marked for translation.
 # This won't find any for which devmsg's format string is on a separate line.
@@ -787,7 +804,7 @@ exclude_file_name_regexp--sc_bindtextdomain = \
 exclude_file_name_regexp--sc_trailing_blank = \
   ^(tests/pr/|gl/.*\.diff$$|man/help2man)
 exclude_file_name_regexp--sc_system_h_headers = \
-  ^src/((system|copy)\.h|make-prime-list\.c)$$
+  ^src/((die|system|copy)\.h|make-prime-list\.c)$$
 
 _src = (false|lbracket|ls-(dir|ls|vdir)|tac-pipe|uname-(arch|uname))
 exclude_file_name_regexp--sc_require_config_h_first = \

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Test for proper detection of EPIPE with ignored SIGPIPE
+# exercise 'sort -h' in locales where thousands separator is blank
 
 # Copyright (C) 2016 Free Software Foundation, Inc.
 
@@ -17,25 +17,32 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
-print_ver_ seq
+print_ver_ sort
 
-(trap '' PIPE && yes | :) 2>&1 | grep -qF 'Broken pipe' ||
-    skip_ 'trapping SIGPIPE is not supported'
+test "$(LC_ALL=sv_SE locale thousands_sep)" = ' ' \
+  || skip_ 'The Swedish locale with blank thousands separator is unavailable.'
 
-# upon EPIPE with signals ignored, 'seq' should exit with an error.
-timeout 10 sh -c \
-  'trap "" PIPE && { seq inf 2>err; echo $? >code; } | head -n1' >out
+tee exp1 exp3 > in << _EOF_
+1       1k      1 M     4 003   1M
+2k      2M      2 k     4 002   2
+3M      3       3 G     4 001   3k
+_EOF_
 
-# Exit-code must be 1, indicating 'write error'
-echo 1 > exp || framework_failure_
-compare exp out || fail=1
-compare exp code || fail=1
+cat > exp2 << _EOF_
+3M      3       3 G     4 001   3k
+1       1k      1 M     4 003   1M
+2k      2M      2 k     4 002   2
+_EOF_
 
-# The error message must begin with "standard output:"
-# (but don't hard-code the strerror text)
-grep '^seq: standard output: ' err \
-  || { warn_ "seq emitted incorrect error on EPIPE"; \
-       cat err;\
-       fail=1; }
+cat > exp5 << _EOF_
+3M      3       3 G     4 001   3k
+2k      2M      2 k     4 002   2
+1       1k      1 M     4 003   1M
+_EOF_
+
+for i in 1 2 3 5; do
+  LC_ALL="sv_SE.utf8" sort -h -k $i "in" > "out${i}" || fail=1
+  compare "exp${i}" "out${i}" || fail=1
+done
 
 Exit $fail

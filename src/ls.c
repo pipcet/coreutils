@@ -87,6 +87,7 @@
 #include "acl.h"
 #include "argmatch.h"
 #include "dev-ino.h"
+#include "die.h"
 #include "error.h"
 #include "filenamecat.h"
 #include "hard-locale.h"
@@ -1034,6 +1035,23 @@ dired_dump_obstack (const char *prefix, struct obstack *os)
     }
 }
 
+/* Return the address of the first plain %b spec in FMT, or NULL if
+   there is no such spec.  %5b etc. do not match, so that user
+   widths/flags are honored.  */
+
+static char const * _GL_ATTRIBUTE_PURE
+first_percent_b (char const *fmt)
+{
+  for (; *fmt; fmt++)
+    if (fmt[0] == '%')
+      switch (fmt[1])
+        {
+        case 'b': return fmt;
+        case '%': fmt++; break;
+        }
+  return NULL;
+}
+
 /* Read the abbreviated month names from the locale, to align them
    and to determine the max width of the field and to truncate names
    greater than our max allowed.
@@ -1044,18 +1062,25 @@ dired_dump_obstack (const char *prefix, struct obstack *os)
 
 /* max number of display cells to use */
 enum { MAX_MON_WIDTH = 5 };
-/* In the unlikely event that the abmon[] storage is not big enough
-   an error message will be displayed, and we revert to using
-   unmodified abbreviated month names from the locale database.  */
-static char abmon[12][MAX_MON_WIDTH * 2 * MB_LEN_MAX + 1];
-/* minimum width needed to align %b, 0 => don't use precomputed values.  */
-static size_t required_mon_width;
+/* abformat[RECENT][MON] is the format to use for time stamps with
+   recentness RECENT and month MON.  */
+enum { ABFORMAT_SIZE = 128 };
+static char abformat[2][12][ABFORMAT_SIZE];
+/* True if precomputed formats should be used.  This can be false if
+   nl_langinfo fails, if a format or month abbreviation is unusually
+   long, or if a month abbreviation contains '%'.  */
+static bool use_abformat;
 
-static size_t
-abmon_init (void)
+/* Store into ABMON the abbreviated month names, suitably aligned.
+   Return true if successful.  */
+
+static bool
+abmon_init (char abmon[12][ABFORMAT_SIZE])
 {
-#ifdef HAVE_NL_LANGINFO
-  required_mon_width = MAX_MON_WIDTH;
+#ifndef HAVE_NL_LANGINFO
+  return false;
+#else
+  size_t required_mon_width = MAX_MON_WIDTH;
   size_t curr_max_width;
   do
     {
@@ -1064,24 +1089,62 @@ abmon_init (void)
       for (int i = 0; i < 12; i++)
         {
           size_t width = curr_max_width;
-
-          size_t req = mbsalign (nl_langinfo (ABMON_1 + i),
-                                 abmon[i], sizeof (abmon[i]),
+          char const *abbr = nl_langinfo (ABMON_1 + i);
+          if (strchr (abbr, '%'))
+            return false;
+          size_t req = mbsalign (abbr, abmon[i], ABFORMAT_SIZE,
                                  &width, MBS_ALIGN_LEFT, 0);
-
-          if (req == (size_t) -1 || req >= sizeof (abmon[i]))
-            {
-              required_mon_width = 0; /* ignore precomputed strings.  */
-              return required_mon_width;
-            }
-
+          if (! (req < ABFORMAT_SIZE))
+            return false;
           required_mon_width = MAX (required_mon_width, width);
         }
     }
   while (curr_max_width > required_mon_width);
-#endif
 
-  return required_mon_width;
+  return true;
+#endif
+}
+
+/* Initialize ABFORMAT and USE_ABFORMAT.  */
+
+static void
+abformat_init (void)
+{
+  char const *pb[2];
+  for (int recent = 0; recent < 2; recent++)
+    pb[recent] = first_percent_b (long_time_format[recent]);
+  if (! (pb[0] || pb[1]))
+    return;
+
+  char abmon[12][ABFORMAT_SIZE];
+  if (! abmon_init (abmon))
+    return;
+
+  for (int recent = 0; recent < 2; recent++)
+    {
+      char const *fmt = long_time_format[recent];
+      for (int i = 0; i < 12; i++)
+        {
+          char *nfmt = abformat[recent][i];
+          int nbytes;
+
+          if (! pb[recent])
+            nbytes = snprintf (nfmt, ABFORMAT_SIZE, "%s", fmt);
+          else
+            {
+              if (! (pb[recent] - fmt <= MIN (ABFORMAT_SIZE, INT_MAX)))
+                return;
+              int prefix_len = pb[recent] - fmt;
+              nbytes = snprintf (nfmt, ABFORMAT_SIZE, "%.*s%s%s",
+                                 prefix_len, fmt, abmon[i], pb[recent] + 2);
+            }
+
+          if (! (0 <= nbytes && nbytes < ABFORMAT_SIZE))
+            return;
+        }
+    }
+
+  use_abformat = true;
 }
 
 static size_t
@@ -1244,13 +1307,12 @@ process_signals (void)
     }
 }
 
-int
-main (int argc, char **argv)
-{
-  int i;
-  struct pending *thispend;
-  int n_files;
+/* Setup signal handlers if INIT is true,
+   otherwise restore to the default.  */
 
+static void
+signal_setup (bool init)
+{
   /* The signals that are trapped, and the number of such signals.  */
   static int const sig[] =
     {
@@ -1278,8 +1340,77 @@ main (int argc, char **argv)
   enum { nsigs = ARRAY_CARDINALITY (sig) };
 
 #if ! SA_NOCLDSTOP
-  bool caught_sig[nsigs];
+  static bool caught_sig[nsigs];
 #endif
+
+  int j;
+
+  if (init)
+    {
+#if SA_NOCLDSTOP
+      struct sigaction act;
+
+      sigemptyset (&caught_signals);
+      for (j = 0; j < nsigs; j++)
+        {
+          sigaction (sig[j], NULL, &act);
+          if (act.sa_handler != SIG_IGN)
+            sigaddset (&caught_signals, sig[j]);
+        }
+
+      act.sa_mask = caught_signals;
+      act.sa_flags = SA_RESTART;
+
+      for (j = 0; j < nsigs; j++)
+        if (sigismember (&caught_signals, sig[j]))
+          {
+            act.sa_handler = sig[j] == SIGTSTP ? stophandler : sighandler;
+            sigaction (sig[j], &act, NULL);
+          }
+#else
+      for (j = 0; j < nsigs; j++)
+        {
+          caught_sig[j] = (signal (sig[j], SIG_IGN) != SIG_IGN);
+          if (caught_sig[j])
+            {
+              signal (sig[j], sig[j] == SIGTSTP ? stophandler : sighandler);
+              siginterrupt (sig[j], 0);
+            }
+        }
+#endif
+    }
+  else /* restore.  */
+    {
+#if SA_NOCLDSTOP
+      for (j = 0; j < nsigs; j++)
+        if (sigismember (&caught_signals, sig[j]))
+          signal (sig[j], SIG_DFL);
+#else
+      for (j = 0; j < nsigs; j++)
+        if (caught_sig[j])
+          signal (sig[j], SIG_DFL);
+#endif
+    }
+}
+
+static inline void
+signal_init (void)
+{
+  signal_setup (true);
+}
+
+static inline void
+signal_restore (void)
+{
+  signal_setup (false);
+}
+
+int
+main (int argc, char **argv)
+{
+  int i;
+  struct pending *thispend;
+  int n_files;
 
   initialize_main (&argc, &argv);
   set_program_name (argv[0]);
@@ -1314,46 +1445,6 @@ main (int argc, char **argv)
           || (is_colored (C_EXEC) && color_symlink_as_referent)
           || (is_colored (C_MISSING) && format == long_format))
         check_symlink_color = true;
-
-      /* If the standard output is a controlling terminal, watch out
-         for signals, so that the colors can be restored to the
-         default state if "ls" is suspended or interrupted.  */
-
-      if (0 <= tcgetpgrp (STDOUT_FILENO))
-        {
-          int j;
-#if SA_NOCLDSTOP
-          struct sigaction act;
-
-          sigemptyset (&caught_signals);
-          for (j = 0; j < nsigs; j++)
-            {
-              sigaction (sig[j], NULL, &act);
-              if (act.sa_handler != SIG_IGN)
-                sigaddset (&caught_signals, sig[j]);
-            }
-
-          act.sa_mask = caught_signals;
-          act.sa_flags = SA_RESTART;
-
-          for (j = 0; j < nsigs; j++)
-            if (sigismember (&caught_signals, sig[j]))
-              {
-                act.sa_handler = sig[j] == SIGTSTP ? stophandler : sighandler;
-                sigaction (sig[j], &act, NULL);
-              }
-#else
-          for (j = 0; j < nsigs; j++)
-            {
-              caught_sig[j] = (signal (sig[j], SIG_IGN) != SIG_IGN);
-              if (caught_sig[j])
-                {
-                  signal (sig[j], sig[j] == SIGTSTP ? stophandler : sighandler);
-                  siginterrupt (sig[j], 0);
-                }
-            }
-#endif
-        }
     }
 
   if (dereference == DEREF_UNDEFINED)
@@ -1466,32 +1557,21 @@ main (int argc, char **argv)
       print_dir_name = true;
     }
 
-  if (print_with_color)
+  if (print_with_color && used_color)
     {
       int j;
 
-      if (used_color)
-        {
-          /* Skip the restore when it would be a no-op, i.e.,
-             when left is "\033[" and right is "m".  */
-          if (!(color_indicator[C_LEFT].len == 2
-                && memcmp (color_indicator[C_LEFT].string, "\033[", 2) == 0
-                && color_indicator[C_RIGHT].len == 1
-                && color_indicator[C_RIGHT].string[0] == 'm'))
-            restore_default_color ();
-        }
+      /* Skip the restore when it would be a no-op, i.e.,
+         when left is "\033[" and right is "m".  */
+      if (!(color_indicator[C_LEFT].len == 2
+            && memcmp (color_indicator[C_LEFT].string, "\033[", 2) == 0
+            && color_indicator[C_RIGHT].len == 1
+            && color_indicator[C_RIGHT].string[0] == 'm'))
+        restore_default_color ();
+
       fflush (stdout);
 
-      /* Restore the default signal handling.  */
-#if SA_NOCLDSTOP
-      for (j = 0; j < nsigs; j++)
-        if (sigismember (&caught_signals, sig[j]))
-          signal (sig[j], SIG_DFL);
-#else
-      for (j = 0; j < nsigs; j++)
-        if (caught_sig[j])
-          signal (sig[j], SIG_DFL);
-#endif
+      signal_restore ();
 
       /* Act on any signals that arrived before the default was restored.
          This can process signals out of order, but there doesn't seem to
@@ -1764,8 +1844,8 @@ decode_switches (int argc, char **argv)
 
         case 'w':
           if (! set_line_length (optarg))
-            error (LS_FAILURE, 0, "%s: %s", _("invalid line width"),
-                   quote (optarg));
+            die (LS_FAILURE, 0, "%s: %s", _("invalid line width"),
+                 quote (optarg));
           break;
 
         case 'x':
@@ -2043,8 +2123,8 @@ decode_switches (int argc, char **argv)
           else
             {
               if (strchr (p1 + 1, '\n'))
-                error (LS_FAILURE, 0, _("invalid time style format %s"),
-                       quote (p0));
+                die (LS_FAILURE, 0, _("invalid time style format %s"),
+                     quote (p0));
               *p1++ = '\0';
             }
           long_time_format[0] = p0;
@@ -2102,11 +2182,7 @@ decode_switches (int argc, char **argv)
             }
         }
 
-      /* Note we leave %5b etc. alone so user widths/flags are honored.  */
-      if (strstr (long_time_format[0], "%b")
-          || strstr (long_time_format[1], "%b"))
-        if (!abmon_init ())
-          error (0, 0, _("error initializing month strings"));
+      abformat_init ();
     }
 
   return optind;
@@ -3038,6 +3114,7 @@ gobble_file (char const *name, enum filetype type, ino_t inode,
                  directory, and --dereference-command-line-symlink-to-dir is
                  in effect.  Fall through so that we call lstat instead.  */
             }
+          /* fall through */
 
         default: /* DEREF_NEVER */
           err = lstat (absolute_name, &f->stat);
@@ -3684,29 +3761,13 @@ print_current_files (void)
    process by around 17%, compared to letting strftime() handle the %b.  */
 
 static size_t
-align_nstrftime (char *buf, size_t size, char const *fmt, struct tm const *tm,
+align_nstrftime (char *buf, size_t size, bool recent, struct tm const *tm,
                  timezone_t tz, int ns)
 {
-  const char *nfmt = fmt;
-  /* In the unlikely event that rpl_fmt below is not large enough,
-     the replacement is not done.  A malloc here slows ls down by 2%  */
-  char rpl_fmt[sizeof (abmon[0]) + 100];
-  const char *pb;
-  if (required_mon_width && (pb = strstr (fmt, "%b"))
-      && 0 <= tm->tm_mon && tm->tm_mon <= 11)
-    {
-      if (strlen (fmt) < (sizeof (rpl_fmt) - sizeof (abmon[0]) + 2))
-        {
-          char *pfmt = rpl_fmt;
-          nfmt = rpl_fmt;
-
-          pfmt = mempcpy (pfmt, fmt, pb - fmt);
-          pfmt = stpcpy (pfmt, abmon[tm->tm_mon]);
-          strcpy (pfmt, pb + 2);
-        }
-    }
-  size_t ret = nstrftime (buf, size, nfmt, tm, tz, ns);
-  return ret;
+  char const *nfmt = (use_abformat
+                      ? abformat[recent][tm->tm_mon]
+                      : long_time_format[recent]);
+  return nstrftime (buf, size, nfmt, tm, tz, ns);
 }
 
 /* Return the expected number of columns in a long-format time stamp,
@@ -3732,9 +3793,8 @@ long_time_expected_width (void)
          their implementations limit the offset to 167:59 and 24:00, resp.  */
       if (localtime_rz (localtz, &epoch, &tm))
         {
-          size_t len =
-            align_nstrftime (buf, sizeof buf, long_time_format[0], &tm,
-                             localtz, 0);
+          size_t len = align_nstrftime (buf, sizeof buf, false,
+                                        &tm, localtz, 0);
           if (len != 0)
             width = mbsnwidth (buf, len, 0);
         }
@@ -3990,7 +4050,6 @@ print_long_format (const struct fileinfo *f)
     {
       struct timespec six_months_ago;
       bool recent;
-      char const *fmt;
 
       /* If the file appears to be in the future, update the current
          time, in case the file happens to have been modified since
@@ -4007,11 +4066,10 @@ print_long_format (const struct fileinfo *f)
 
       recent = (timespec_cmp (six_months_ago, when_timespec) < 0
                 && (timespec_cmp (when_timespec, current_time) < 0));
-      fmt = long_time_format[recent];
 
       /* We assume here that all time zones are offset from UTC by a
          whole number of seconds.  */
-      s = align_nstrftime (p, TIME_STAMP_LEN_MAXIMUM + 1, fmt,
+      s = align_nstrftime (p, TIME_STAMP_LEN_MAXIMUM + 1, recent,
                            &when_local, localtz, when_timespec.tv_nsec);
     }
 
@@ -4475,6 +4533,14 @@ put_indicator (const struct bin_str *ind)
   if (! used_color)
     {
       used_color = true;
+
+      /* If the standard output is a controlling terminal, watch out
+         for signals, so that the colors can be restored to the
+         default state if "ls" is suspended or interrupted.  */
+
+      if (0 <= tcgetpgrp (STDOUT_FILENO))
+        signal_init ();
+
       prep_non_filename_text ();
     }
 
@@ -4891,8 +4957,7 @@ Sort entries alphabetically if none of -cftuvSUX nor --sort is specified.\n\
 "), stdout);
       fputs (_("\
   -n, --numeric-uid-gid      like -l, but list numeric user and group IDs\n\
-  -N, --literal              print raw entry names (don't treat e.g. control\n\
-                               characters specially)\n\
+  -N, --literal              print entry names without quoting\n\
   -o                         like -l, but do not list group information\n\
   -p, --indicator-style=slash\n\
                              append / indicator to directories\n\

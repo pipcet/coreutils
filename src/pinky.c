@@ -25,6 +25,7 @@
 #include "system.h"
 
 #include "canon-host.h"
+#include "die.h"
 #include "error.h"
 #include "hard-locale.h"
 #include "readutmp.h"
@@ -36,8 +37,6 @@
   proper_name ("Joseph Arceneaux"), \
   proper_name ("David MacKenzie"), \
   proper_name ("Kaveh Ghazi")
-
-char *ttyname (int);
 
 /* If true, display the hours:minutes since each user has touched
    the keyboard, or blank if within the last minute, or days followed
@@ -468,7 +467,7 @@ short_pinky (const char *filename,
   STRUCT_UTMP *utmp_buf = NULL;
 
   if (read_utmp (filename, &n_users, &utmp_buf, 0) != 0)
-    error (EXIT_FAILURE, errno, "%s", quotef (filename));
+    die (EXIT_FAILURE, errno, "%s", quotef (filename));
 
   scan_entries (n_users, utmp_buf, argc_names, argv_names);
 

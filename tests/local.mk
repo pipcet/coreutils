@@ -279,6 +279,7 @@ all_tests =					\
   tests/misc/csplit-heap.sh			\
   tests/misc/csplit-io-err.sh			\
   tests/misc/csplit-suppress-matched.pl		\
+  tests/misc/date-debug.sh			\
   tests/misc/date-sec.sh			\
   tests/misc/dircolors.pl			\
   tests/misc/dirname.pl				\
@@ -348,6 +349,7 @@ all_tests =					\
   tests/misc/sort-discrim.sh			\
   tests/misc/sort-files0-from.pl		\
   tests/misc/sort-float.sh			\
+  tests/misc/sort-h-thousands-sep.sh		\
   tests/misc/sort-merge.pl			\
   tests/misc/sort-merge-fdlimit.sh		\
   tests/misc/sort-month.sh			\
@@ -550,6 +552,7 @@ all_tests =					\
   tests/install/d-slashdot.sh			\
   tests/install/install-C.sh			\
   tests/install/install-C-selinux.sh		\
+  tests/install/install-Z-selinux.sh		\
   tests/install/strip-program.sh		\
   tests/install/trap.sh				\
   tests/ln/backup-1.sh				\

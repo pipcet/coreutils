@@ -35,6 +35,7 @@
 #if HASH_ALGO_SHA512 || HASH_ALGO_SHA384
 # include "sha512.h"
 #endif
+#include "die.h"
 #include "error.h"
 #include "fadvise.h"
 #include "stdio--.h"
@@ -462,14 +463,18 @@ print_filename (char const *file, bool escape)
    text because it was a terminal.
 
    Put the checksum in *BIN_RESULT, which must be properly aligned.
+   Put true in *MISSING if the file can't be opened due to ENOENT.
    Return true if successful.  */
 
 static bool
-digest_file (const char *filename, int *binary, unsigned char *bin_result)
+digest_file (const char *filename, int *binary, unsigned char *bin_result,
+             bool *missing)
 {
   FILE *fp;
   int err;
   bool is_stdin = STREQ (filename, "-");
+
+  *missing = false;
 
   if (is_stdin)
     {
@@ -490,7 +495,7 @@ digest_file (const char *filename, int *binary, unsigned char *bin_result)
         {
           if (ignore_missing && errno == ENOENT)
             {
-              *bin_result = '\0';
+              *missing = true;
               return true;
             }
           error (0, errno, "%s", quotef (filename));
@@ -564,8 +569,8 @@ digest_check (const char *checkfile_name)
 
       ++line_number;
       if (line_number == 0)
-        error (EXIT_FAILURE, 0, _("%s: too many checksum lines"),
-               quotef (checkfile_name));
+        die (EXIT_FAILURE, 0, _("%s: too many checksum lines"),
+             quotef (checkfile_name));
 
       line_length = getline (&line, &line_chars_allocated, checkfile_stream);
       if (line_length <= 0)
@@ -603,14 +608,14 @@ digest_check (const char *checkfile_name)
                                           '8', '9', 'a', 'b',
                                           'c', 'd', 'e', 'f' };
           bool ok;
+          bool missing;
           /* Only escape in the edge case producing multiple lines,
              to ease automatic processing of status output.  */
           bool needs_escape = ! status_only && strchr (filename, '\n');
 
           properly_formatted_lines = true;
 
-          *bin_buffer = '\1'; /* flag set to 0 for ignored missing files.  */
-          ok = digest_file (filename, &binary, bin_buffer);
+          ok = digest_file (filename, &binary, bin_buffer, &missing);
 
           if (!ok)
             {
@@ -623,10 +628,9 @@ digest_check (const char *checkfile_name)
                   printf (": %s\n", _("FAILED open or read"));
                 }
             }
-          else if (ignore_missing && ! *bin_buffer)
+          else if (ignore_missing && missing)
             {
-              /* Treat an empty buffer as meaning a missing file,
-                 which is ignored with --ignore-missing.  */
+              /* Ignore missing files with --ignore-missing.  */
               ;
             }
           else
@@ -877,8 +881,9 @@ main (int argc, char **argv)
       else
         {
           int file_is_binary = binary;
+          bool missing;
 
-          if (! digest_file (file, &file_is_binary, bin_buffer))
+          if (! digest_file (file, &file_is_binary, bin_buffer, &missing))
             ok = false;
           else
             {
@@ -927,7 +932,7 @@ main (int argc, char **argv)
     }
 
   if (have_read_stdin && fclose (stdin) == EOF)
-    error (EXIT_FAILURE, errno, _("standard input"));
+    die (EXIT_FAILURE, errno, _("standard input"));
 
   return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }

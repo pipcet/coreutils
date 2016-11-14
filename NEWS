@@ -8,6 +8,10 @@ GNU coreutils NEWS                                    -*- outline -*-
   handling ACLs on Cygwin and Solaris platforms. [bug introduced in
   coreutils-8.24]
 
+  cp --parents --no-preserve=mode, no longer copies permissions from source
+  directories, instead using default permissions for created directories.
+  [bug introduced in coreutils-5.93]
+
   chcon, chgrp, chmod, chown, du, and rm, or specifically utilities
   using the FTS interface, now diagnose failures returned by readdir().
   [this bug was inherent in the use of fts: thus, for rm the bug was
@@ -18,8 +22,20 @@ GNU coreutils NEWS                                    -*- outline -*-
   System V style platforms where this information is available only
   in the global variable 'tzname'. [bug introduced in coreutils-8.24]
 
+  factor again outputs immediately when numbers are input interactively.
+  [bug introduced in coreutils-8.24]
+
+  ls --time-style no longer mishandles '%%b' in formats.
+  [bug introduced in coreutils-7.2]
+
+  md5sum --check --ignore-missing no longer treats files with checksums
+  starting with "00" as missing.  This also affects sha*sum.
+  [bug introduced with the --ignore-missing feature in coreutils-8.25]
+
   nl now resets numbering for each page section rather than just for each page.
   [This bug was present in "the beginning".]
+
+  sort -h -k now works even in locales that use blank as thousands separator.
 
   stty --help no longer outputs extraneous gettext header lines
   for translated languages. [bug introduced in coreutils-8.24]
@@ -30,10 +46,33 @@ GNU coreutils NEWS                                    -*- outline -*-
   seq now immediately exits upon write errors.
   [This bug was present in "the beginning".]
 
+  tail -F now continues to process initially untailable files that are replaced
+  by a tailable file.  This was handled correctly when inotify was available,
+  and is now handled correctly in all cases.
+  [bug introduced in fileutils-4.0h]
+
+  tail -f - 'untailable file' will now terminate when there is no more data
+  to read from stdin.  Previously it behaved as if --retry was specified.
+  [This bug was present in "the beginning".]
+
+  tail -f 'remote file' will now avoid outputting repeated data on network
+  file systems that misreport file sizes through stale metadata.
+  [This bug was present in "the beginning" but exacerbated in coreutils-8.24]
+
+  tail -f --retry 'missing file' will now process truncations of that file.
+  Previously truncation was ignored thus not outputting new data in the file.
+  [bug introduced in coreutils-5.3.0]
+
+  tail -f will no longer continually try to open inaccessible files,
+  only doing so if --retry is specified.
+  [This bug was present in "the beginning".]
+
   yes now handles short writes, rather than assuming all writes complete.
   [bug introduced in coreutils-8.24]
 
 ** Changes in behavior
+
+  rm no longer accepts shortened variants of the --no-preserve-root option.
 
   seq no longer accepts 0 value as increment, and now also rejects NaN
   values for any argument.
@@ -48,11 +87,29 @@ GNU coreutils NEWS                                    -*- outline -*-
 
 ** Improvements
 
+  df now filters the system mount list more efficiently, with 20000
+  mount entries now being processed in about 1.1s compared to 1.7s.
+
+  install -Z now also sets the default SELinux context for created directories.
+
+  ls is now fully responsive to signals until the first escape sequence is
+  written to a terminal.
+
   stat and tail now know about "prl_fs" (a parallels file system),
   "m1fs" (a Plexistor file system), "wslfs" (Windows Subsystem for Linux),
   and "smb2".  stat -f --format=%T now reports the file system type, and
   tail -f uses polling for "prl_fs" and "smb2", inotify for "m1fs",
   and attempts inotify for "wslfs".
+
+  stat --format=%N for quoting file names now honors the
+  same QUOTING_STYLE environment variable values as ls.
+
+** New Features
+
+  date now accepts the --debug option, to annotate the parsed date string,
+  display timezone information, and warn about potential misuse.
+
+  date now accepts the %q format to output the quarter of the year.
 
 
 * Noteworthy changes in release 8.25 (2016-01-20) [stable]
