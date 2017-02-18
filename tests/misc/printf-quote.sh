@@ -1,7 +1,7 @@
 #!/bin/sh
 # tests for printf %q
 
-# Copyright (C) 2015-2016 Free Software Foundation, Inc.
+# Copyright (C) 2015-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -42,13 +42,13 @@ if test "$LOCALE_FR_UTF8" != "none"; then
    #printable multi-byte
    LC_ALL=$f $prog '%q\n' 'áḃç' > out
    #non-printable multi-byte
-   LC_ALL=$f $prog '%q\n' "$(LC_ALL=$f $prog '\u0378')" >> out
+   LC_ALL=$f $prog '%q\n' "$($prog '\xc2\x81')" >> out
    #printable multi-byte in C locale
    LC_ALL=C $prog '%q\n' 'áḃç' >> out
   )
   cat <<\EOF > exp || framework_failure_
 áḃç
-''$'\315\270'
+''$'\302\201'
 ''$'\303\241\341\270\203\303\247'
 EOF
   compare exp out || fail=1

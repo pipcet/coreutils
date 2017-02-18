@@ -1,7 +1,7 @@
 #!/bin/sh
 # Exercise tail's behavior regarding missing files with/without --retry.
 
-# Copyright (C) 2013-2016 Free Software Foundation, Inc.
+# Copyright (C) 2013-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -148,6 +148,7 @@ returns_ 1 tail $mode --follow=descriptor missing >out 2>&1 || fail=1
 [ "$(countlines_)" = 2 ]         || { fail=1; cat out; }
 grep -F 'cannot open' out        || { fail=1; cat out; }
 grep -F 'no files remaining' out || { fail=1; cat out; }
+rm -f out                        || framework_failure_
 
 # === Test:
 # Likewise for --follow=name (without --retry).
@@ -155,13 +156,15 @@ returns_ 1 tail $mode --follow=name missing >out 2>&1 || fail=1
 [ "$(countlines_)" = 2 ]         || { fail=1; cat out; }
 grep -F 'cannot open' out        || { fail=1; cat out; }
 grep -F 'no files remaining' out || { fail=1; cat out; }
+rm -f out                        || framework_failure_
 
 # === Test:
 # Ensure that tail -F retries when the file is initially untailable.
-mkdir untailable
+if ! cat . >/dev/null; then
+mkdir untailable || framework_failure_
 timeout 10 \
   tail $mode $fastpoll -F untailable >out 2>&1 & pid=$!
-# Wait for "cannot open" error.
+# Wait for "cannot follow" error.
 retry_delay_ wait4lines_ .1 6 2 || { cat out; fail=1; }
 { rmdir untailable; echo foo > untailable; }   || framework_failure_
 # Wait for the expected output.
@@ -169,9 +172,12 @@ retry_delay_ wait4lines_ .1 6 4 || { cat out; fail=1; }
 cleanup_
 [ "$(countlines_)" = 4 ]                       || { fail=1; cat out; }
 grep -F 'cannot follow' out                    || { fail=1; cat out; }
-grep -F 'has become accessible' out            || { fail=1; cat out; }
+# The first is the common case, "has appeared" arises with slow rmdir.
+grep -E 'become accessible|has appeared' out   || { fail=1; cat out; }
+grep -F 'giving up' out                        && { fail=1; cat out; }
 grep -F 'foo' out                              || { fail=1; cat out; }
 rm -fd untailable out                          || framework_failure_
+fi
 
 done
 

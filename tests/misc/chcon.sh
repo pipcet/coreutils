@@ -1,7 +1,7 @@
 #!/bin/sh
 # exercise chcon
 
-# Copyright (C) 2007-2016 Free Software Foundation, Inc.
+# Copyright (C) 2007-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@ print_ver_ chcon
 require_root_
 require_selinux_
 skip_if_mcstransd_is_running_
+mls_enabled_ || skip_ 'MLS is disabled'
 
 mkdir -p d/sub/s2 || framework_failure_
 touch f g d/sub/1 d/sub/2 || framework_failure_

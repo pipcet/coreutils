@@ -1,5 +1,5 @@
 /* tr -- a filter to translate characters
-   Copyright (C) 1991-2016 Free Software Foundation, Inc.
+   Copyright (C) 1991-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 #include "fadvise.h"
 #include "quote.h"
 #include "safe-read.h"
-#include "xfreopen.h"
+#include "xbinary-io.h"
 #include "xstrtol.h"
 
 /* The official name of this program (e.g., no 'g' prefix).  */
@@ -1786,11 +1786,8 @@ main (int argc, char **argv)
   /* Use binary I/O, since 'tr' is sometimes used to transliterate
      non-printable characters, or characters which are stripped away
      by text-mode reads (like CR and ^Z).  */
-  if (O_BINARY && ! isatty (STDIN_FILENO))
-    xfreopen (NULL, "rb", stdin);
-  if (O_BINARY && ! isatty (STDOUT_FILENO))
-    xfreopen (NULL, "wb", stdout);
-
+  xset_binary_mode (STDIN_FILENO, O_BINARY);
+  xset_binary_mode (STDOUT_FILENO, O_BINARY);
   fadvise (stdin, FADVISE_SEQUENTIAL);
 
   if (squeeze_repeats && non_option_args == 1)

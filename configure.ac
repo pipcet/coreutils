@@ -1,7 +1,7 @@
 # -*- autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-# Copyright (C) 1991-2016 Free Software Foundation, Inc.
+# Copyright (C) 1991-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -132,6 +132,7 @@ if test "$gl_gcc_warnings" = yes; then
   nw="$nw -Wswitch-enum"            # Too many warnings for now
   nw="$nw -Wswitch-default"         # Too many warnings for now
   nw="$nw -Wstack-protector"        # not worth working around
+  nw="$nw -Wtype-limits"            # False alarms for portable code
   # things I might fix soon:
   nw="$nw -Wfloat-equal"            # sort.c, seq.c
   nw="$nw -Wmissing-format-attribute" # copy.c
@@ -141,7 +142,7 @@ if test "$gl_gcc_warnings" = yes; then
 
   # Using -Wstrict-overflow is a pain, but the alternative is worse.
   # For an example, see the code that provoked this report:
-  # http://gcc.gnu.org/bugzilla/show_bug.cgi?id=33498
+  # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=33498
   # Code like that still infloops with gcc-4.6.0 and -O2.  Scary indeed.
 
   gl_MANYWARN_ALL_GCC([ws])
@@ -150,6 +151,7 @@ if test "$gl_gcc_warnings" = yes; then
     gl_WARN_ADD([$w])
   done
   gl_WARN_ADD([-Wno-sign-compare])     # Too many warnings for now
+  gl_WARN_ADD([-Wno-type-limits])      # False alarms for portable code
   gl_WARN_ADD([-Wno-unused-parameter]) # Too many warnings for now
   gl_WARN_ADD([-Wno-format-nonliteral])
 
@@ -250,6 +252,8 @@ AC_CHECK_FUNCS([chroot],
         gl_ADD_PROG([optional_bin_progs], [chroot]))
 AC_CHECK_FUNCS([gethostid],
         gl_ADD_PROG([optional_bin_progs], [hostid]))
+AC_CHECK_FUNCS([sigsuspend],
+        gl_ADD_PROG([optional_bin_progs], [timeout]))
 
 gl_WINSIZE_IN_PTEM
 

@@ -3,7 +3,7 @@
 # Ensure that seq prints exactly two numbers for a 2-number integral
 # range at the limit of floating point precision.
 
-# Copyright (C) 2008-2016 Free Software Foundation, Inc.
+# Copyright (C) 2008-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,8 +23,7 @@ print_ver_ seq
 getlimits_
 
 # Run this test only with glibc and sizeof (long double) > sizeof (double).
-# Otherwise, there are known failures:
-# http://thread.gmane.org/gmane.comp.gnu.coreutils.bugs/14939/focus=14944
+# Otherwise, there are known failures.
 cat <<\EOF > long.c
 #include <features.h>
 #if defined __GNU_LIBRARY__ && __GLIBC__ >= 2

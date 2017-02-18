@@ -1,5 +1,5 @@
 /* touch -- change modification and access times of files
-   Copyright (C) 1987-2016 Free Software Foundation, Inc.
+   Copyright (C) 1987-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -374,8 +374,8 @@ main (int argc, char **argv)
               && newtime[0].tv_sec == now.tv_sec
               && newtime[0].tv_nsec == now.tv_nsec)
             {
-              /* Check that it really was "-d now", and not a time
-                 stamp that just happens to be the current time.  */
+              /* Check that it really was "-d now", and not a timestamp
+                 that just happens to be the current time.  */
               struct timespec notnow, notnow1;
               notnow.tv_sec = now.tv_sec ^ 1;
               notnow.tv_nsec = now.tv_nsec;

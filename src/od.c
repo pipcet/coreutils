@@ -1,5 +1,5 @@
 /* od -- dump files in octal and other formats
-   Copyright (C) 1992-2016 Free Software Foundation, Inc.
+   Copyright (C) 1992-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 #include "ftoastr.h"
 #include "quote.h"
 #include "stat-size.h"
-#include "xfreopen.h"
+#include "xbinary-io.h"
 #include "xprintf.h"
 #include "xstrtol.h"
 
@@ -390,7 +390,7 @@ TYPE is made up of one or more of these specifications:\n\
 "), stdout);
       fputs (_("\
   d[SIZE]    signed decimal, SIZE bytes per integer\n\
-  f[SIZE]    floating point, SIZE bytes per integer\n\
+  f[SIZE]    floating point, SIZE bytes per float\n\
   o[SIZE]    octal, SIZE bytes per integer\n\
   u[SIZE]    unsigned decimal, SIZE bytes per integer\n\
   x[SIZE]    hexadecimal, SIZE bytes per integer\n\
@@ -914,8 +914,7 @@ open_next_file (void)
           input_filename = _("standard input");
           in_stream = stdin;
           have_read_stdin = true;
-          if (O_BINARY && ! isatty (STDIN_FILENO))
-            xfreopen (NULL, "rb", stdin);
+          xset_binary_mode (STDIN_FILENO, O_BINARY);
         }
       else
         {

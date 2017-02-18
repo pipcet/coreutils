@@ -1,5 +1,5 @@
 /* Permuted index for GNU, with keywords in their context.
-   Copyright (C) 1990-2016 Free Software Foundation, Inc.
+   Copyright (C) 1990-2017 Free Software Foundation, Inc.
    François Pinard <pinard@iro.umontreal.ca>, 1988.
 
    This program is free software: you can redistribute it and/or modify
@@ -1235,6 +1235,8 @@ fix_output_parameters (void)
 
   if ((auto_reference || input_reference) && !right_reference)
     line_width -= reference_max_width + gap_size;
+  if (line_width < 0)
+    line_width = 0;
 
   /* The output lines, minimally, will contain from left to right a left
      context, a gap, and a keyword followed by the right context with no

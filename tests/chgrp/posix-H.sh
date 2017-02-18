@@ -1,7 +1,7 @@
 #!/bin/sh
 # Test POSIX-mandated -H option.
 
-# Copyright (C) 2003-2016 Free Software Foundation, Inc.
+# Copyright (C) 2003-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
 print_ver_ chgrp
 require_membership_in_two_groups_
+require_local_dir_
 
 set _ $groups; shift
 g1=$1

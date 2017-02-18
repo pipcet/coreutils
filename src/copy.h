@@ -1,5 +1,5 @@
 /* core functions for copying files and directories
-   Copyright (C) 1989-2016 Free Software Foundation, Inc.
+   Copyright (C) 1989-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -136,6 +136,9 @@ struct cp_options
   /* If true, rather than copying, first attempt to use rename.
      If that fails, then resort to copying.  */
   bool move_mode;
+
+  /* If true, install(1) is the caller.  */
+  bool install_mode;
 
   /* Whether this process has appropriate privileges to chown a file
      whose owner is not the effective user ID.  */

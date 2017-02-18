@@ -1,5 +1,5 @@
 /* copy.c -- core functions for copying files and directories
-   Copyright (C) 1989-2016 Free Software Foundation, Inc.
+   Copyright (C) 1989-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -46,6 +46,7 @@
 #include "file-set.h"
 #include "filemode.h"
 #include "filenamecat.h"
+#include "force-link.h"
 #include "full-write.h"
 #include "hash.h"
 #include "hash-triple.h"
@@ -75,6 +76,7 @@
 # include <linux/falloc.h>
 #endif
 
+/* See HAVE_FALLOCATE workaround when including this file.  */
 #ifdef HAVE_LINUX_FS_H
 # include <linux/fs.h>
 #endif
@@ -166,7 +168,8 @@ static int
 punch_hole (int fd, off_t offset, off_t length)
 {
   int ret = 0;
-#if HAVE_FALLOCATE
+/* +0 is to work around older <linux/fs.h> defining HAVE_FALLOCATE to empty.  */
+#if HAVE_FALLOCATE + 0
 # if defined FALLOC_FL_PUNCH_HOLE && defined FALLOC_FL_KEEP_SIZE
   ret = fallocate (fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
                    offset, length);
@@ -1621,11 +1624,13 @@ same_file_ok (char const *src_name, struct stat const *src_sb,
         }
     }
 
-  /* It's ok to remove a destination symlink.  But that works only when we
-     unlink before opening the destination and when the source and destination
-     files are on the same partition.  */
-  if (x->unlink_dest_before_opening
-      && S_ISLNK (dst_sb_link->st_mode))
+  /* It's ok to remove a destination symlink.  But that works only
+     when creating symbolic links, or when the source and destination
+     are on the same file system and when creating hard links or when
+     unlinking before opening the destination.  */
+  if (x->symbolic_link
+      || ((x->hard_link || x->unlink_dest_before_opening)
+          && S_ISLNK (dst_sb_link->st_mode)))
     return dst_sb_link->st_dev == src_sb_link->st_dev;
 
   if (x->dereference == DEREF_NEVER)
@@ -1777,36 +1782,17 @@ static bool
 create_hard_link (char const *src_name, char const *dst_name,
                   bool replace, bool verbose, bool dereference)
 {
-  /* We want to guarantee that symlinks are not followed, unless requested.  */
-  int flags = 0;
-  if (dereference)
-    flags = AT_SYMLINK_FOLLOW;
-
-  bool link_failed = (linkat (AT_FDCWD, src_name, AT_FDCWD, dst_name, flags)
-                      != 0);
-
-  /* If the link failed because of an existing destination,
-     remove that file and then call link again.  */
-  if (link_failed && replace && errno == EEXIST)
-    {
-      if (unlink (dst_name) != 0)
-        {
-          error (0, errno, _("cannot remove %s"), quoteaf (dst_name));
-          return false;
-        }
-      if (verbose)
-        printf (_("removed %s\n"), quoteaf (dst_name));
-      link_failed = (linkat (AT_FDCWD, src_name, AT_FDCWD, dst_name, flags)
-                     != 0);
-    }
-
-  if (link_failed)
+  int status = force_linkat (AT_FDCWD, src_name, AT_FDCWD, dst_name,
+                             dereference ? AT_SYMLINK_FOLLOW : 0,
+                             replace);
+  if (status < 0)
     {
       error (0, errno, _("cannot create hard link %s to %s"),
              quoteaf_n (0, dst_name), quoteaf_n (1, src_name));
       return false;
     }
-
+  if (0 < status && verbose)
+    printf (_("removed %s\n"), quoteaf (dst_name));
   return true;
 }
 
@@ -1873,7 +1859,10 @@ copy_internal (char const *src_name, char const *dst_name,
 
   if (S_ISDIR (src_mode) && !x->recursive)
     {
-      error (0, 0, _("omitting directory %s"), quoteaf (src_name));
+      error (0, 0, ! x->install_mode /* cp */
+                   ? _("-r not specified; omitting directory %s")
+                   : _("omitting directory %s"),
+             quoteaf (src_name));
       return false;
     }
 
@@ -1943,9 +1932,9 @@ copy_internal (char const *src_name, char const *dst_name,
 
           if (!S_ISDIR (src_mode) && x->update)
             {
-              /* When preserving time stamps (but not moving within a file
-                 system), don't worry if the destination time stamp is
-                 less than the source merely because of time stamp
+              /* When preserving timestamps (but not moving within a file
+                 system), don't worry if the destination timestamp is
+                 less than the source merely because of timestamp
                  truncation.  */
               int options = ((x->preserve_timestamps
                               && ! (x->move_mode
@@ -2587,7 +2576,9 @@ copy_internal (char const *src_name, char const *dst_name,
               goto un_backup;
             }
         }
-      if (symlink (src_name, dst_name) != 0)
+      if (force_symlinkat (src_name, AT_FDCWD, dst_name,
+                           x->unlink_dest_after_failed_open)
+          < 0)
         {
           error (0, errno, _("cannot create symbolic link %s to %s"),
                  quoteaf_n (0, dst_name), quoteaf_n (1, src_name));
@@ -2612,7 +2603,9 @@ copy_internal (char const *src_name, char const *dst_name,
            && !(! CAN_HARDLINK_SYMLINKS && S_ISLNK (src_mode)
                 && x->dereference == DEREF_NEVER))
     {
-      if (! create_hard_link (src_name, dst_name, false, false, dereference))
+      if (! create_hard_link (src_name, dst_name,
+                              x->unlink_dest_after_failed_open,
+                              false, dereference))
         goto un_backup;
     }
   else if (S_ISREG (src_mode)
@@ -2666,33 +2659,31 @@ copy_internal (char const *src_name, char const *dst_name,
           goto un_backup;
         }
 
-      if (symlink (src_link_val, dst_name) == 0)
-        free (src_link_val);
-      else
+      int symlink_r = force_symlinkat (src_link_val, AT_FDCWD, dst_name,
+                                       x->unlink_dest_after_failed_open);
+      int symlink_err = symlink_r < 0 ? errno : 0;
+      if (symlink_err && x->update && !new_dst && S_ISLNK (dst_sb.st_mode)
+          && dst_sb.st_size == strlen (src_link_val))
         {
-          int saved_errno = errno;
-          bool same_link = false;
-          if (x->update && !new_dst && S_ISLNK (dst_sb.st_mode)
-              && dst_sb.st_size == strlen (src_link_val))
+          /* See if the destination is already the desired symlink.
+             FIXME: This behavior isn't documented, and seems wrong
+             in some cases, e.g., if the destination symlink has the
+             wrong ownership, permissions, or timestamps.  */
+          char *dest_link_val =
+            areadlink_with_size (dst_name, dst_sb.st_size);
+          if (dest_link_val)
             {
-              /* See if the destination is already the desired symlink.
-                 FIXME: This behavior isn't documented, and seems wrong
-                 in some cases, e.g., if the destination symlink has the
-                 wrong ownership, permissions, or time stamps.  */
-              char *dest_link_val =
-                areadlink_with_size (dst_name, dst_sb.st_size);
-              if (dest_link_val && STREQ (dest_link_val, src_link_val))
-                same_link = true;
+              if (STREQ (dest_link_val, src_link_val))
+                symlink_err = 0;
               free (dest_link_val);
             }
-          free (src_link_val);
-
-          if (! same_link)
-            {
-              error (0, saved_errno, _("cannot create symbolic link %s"),
-                     quoteaf (dst_name));
-              goto un_backup;
-            }
+        }
+      free (src_link_val);
+      if (symlink_err)
+        {
+          error (0, symlink_err, _("cannot create symbolic link %s"),
+                 quoteaf (dst_name));
+          goto un_backup;
         }
 
       if (x->preserve_security_context)

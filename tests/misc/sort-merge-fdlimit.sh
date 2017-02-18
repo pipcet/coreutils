@@ -2,7 +2,7 @@
 # Test whether sort avoids opening more file descriptors than it is
 # allowed when merging files.
 
-# Copyright (C) 2009-2016 Free Software Foundation, Inc.
+# Copyright (C) 2009-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -57,7 +57,7 @@ done
 # ordinary redirection on the 'sort' command.  This is intended to
 # work around bugs in OpenBSD /bin/sh, and some other sh variants,
 # that squirrel away file descriptors before closing them; see
-# <http://lists.gnu.org/archive/html/bug-tar/2010-10/msg00075.html>.
+# <https://lists.gnu.org/archive/html/bug-tar/2010-10/msg00075.html>.
 # This test finds the bug only with shells that do not close FDs on
 # exec, and will miss the bug (if present) on other shells, but it's
 # not easy to fix this without running afoul of the OpenBSD-like sh bugs.

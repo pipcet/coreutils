@@ -1,5 +1,5 @@
 /* Base64 encode/decode strings or files.
-   Copyright (C) 2004-2016 Free Software Foundation, Inc.
+   Copyright (C) 2004-2017 Free Software Foundation, Inc.
 
    This file is part of Base64.
 
@@ -31,7 +31,7 @@
 #include "quote.h"
 #include "xstrtol.h"
 #include "xdectoint.h"
-#include "xfreopen.h"
+#include "xbinary-io.h"
 
 #define AUTHORS proper_name ("Simon Josefsson")
 
@@ -320,8 +320,7 @@ main (int argc, char **argv)
 
   if (STREQ (infile, "-"))
     {
-      if (O_BINARY)
-        xfreopen (NULL, "rb", stdin);
+      xset_binary_mode (STDIN_FILENO, O_BINARY);
       input_fh = stdin;
     }
   else

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Test some of ls's sorting options.
 
-# Copyright (C) 1998-2016 Free Software Foundation, Inc.
+# Copyright (C) 1998-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 print_ver_ ls
 
 # Avoid any possible glitches due to daylight-saving changes near the
-# time stamps used during the test.
+# timestamps used during the test.
 TZ=UTC0
 export TZ
 
@@ -71,7 +71,7 @@ In the output below, the date of last modification for 'a' should
 have been $t3.
 EOF
   ls --full -l a
-  framework_failure_
+  skip_ "touch -m -d '$t3' didn't work"
   ;;
 esac
 
@@ -112,7 +112,7 @@ else
 failed ls ctime test -- this failure is expected at least for SunOS4.1.4
 and for tmpfs file systems on Solaris 5.5.1.
 It is also expected to fail on a btrfs file system until
-http://bugzilla.redhat.com/591068 is addressed.
+https://bugzilla.redhat.com/591068 is addressed.
 
 In the output below, 'c' should have had a ctime more recent than
 that of 'a', but does not.

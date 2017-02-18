@@ -1,7 +1,7 @@
 #!/bin/sh
 # exercise 'sort -h' in locales where thousands separator is blank
 
-# Copyright (C) 2016 Free Software Foundation, Inc.
+# Copyright (C) 2016-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,8 +19,10 @@
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
 print_ver_ sort
 
-test "$(LC_ALL=sv_SE locale thousands_sep)" = ' ' \
-  || skip_ 'The Swedish locale with blank thousands separator is unavailable.'
+TEST_LOCALE='sv_SE'
+
+test "$(LC_ALL="$TEST_LOCALE" locale thousands_sep)" = ' ' ||
+  skip_ 'The Swedish locale with blank thousands separator is unavailable.'
 
 tee exp1 exp3 > in << _EOF_
 1       1k      1 M     4 003   1M
@@ -41,7 +43,7 @@ cat > exp5 << _EOF_
 _EOF_
 
 for i in 1 2 3 5; do
-  LC_ALL="sv_SE.utf8" sort -h -k $i "in" > "out${i}" || fail=1
+  LC_ALL="$TEST_LOCALE" sort -h -k $i "in" > "out${i}" || fail=1
   compare "exp${i}" "out${i}" || fail=1
 done
 

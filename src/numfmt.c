@@ -1,5 +1,5 @@
 /* Reformat numbers like 11505426432 to the more human-readable 11G
-   Copyright (C) 2012-2016 Free Software Foundation, Inc.
+   Copyright (C) 2012-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1443,7 +1443,7 @@ main (int argc, char **argv)
 
   initialize_main (&argc, &argv);
   set_program_name (argv[0]);
-  locale_ok = setlocale (LC_ALL, "");
+  locale_ok = !!setlocale (LC_ALL, "");
   bindtextdomain (PACKAGE, LOCALEDIR);
   textdomain (PACKAGE);
 

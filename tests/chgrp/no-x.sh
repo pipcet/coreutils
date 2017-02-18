@@ -2,7 +2,7 @@
 # Make sure chgrp gives the right diagnostic for a readable,
 # but inaccessible directory.
 
-# Copyright (C) 2003-2016 Free Software Foundation, Inc.
+# Copyright (C) 2003-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 print_ver_ chgrp
 require_membership_in_two_groups_
 skip_if_root_
+require_local_dir_
 
 set _ $groups; shift
 g1=$1

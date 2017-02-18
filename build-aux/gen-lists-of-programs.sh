@@ -31,6 +31,7 @@ build_if_possible_progs='
     pinky
     stdbuf
     stty
+    timeout
     uptime
     users
     who
@@ -40,6 +41,7 @@ build_if_possible_progs='
 # be buildable without problems on any target system.
 normal_progs='
     [
+    b2sum
     base64
     base32
     basename
@@ -117,7 +119,6 @@ normal_progs='
     tail
     tee
     test
-    timeout
     touch
     tr
     true

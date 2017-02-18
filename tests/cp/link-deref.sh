@@ -1,7 +1,7 @@
 #!/bin/sh
 # Exercise cp --link's behavior regarding the dereferencing of symbolic links.
 
-# Copyright (C) 2013-2016 Free Software Foundation, Inc.
+# Copyright (C) 2013-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -92,7 +92,7 @@ for src in dirlink filelink danglink; do
         exp_result=1
         exp_inode=
         exp_ftype=
-        exp_error="cp: omitting directory 'dirlink'"
+        exp_error="cp: -r not specified; omitting directory 'dirlink'"
       elif [ "$src" = 'dirlink' ]; then
         # cp --link -R 'dirlink' should create a new directory.
         exp_result=0

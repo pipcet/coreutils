@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # Test "date".
 
-# Copyright (C) 2005-2016 Free Software Foundation, Inc.
+# Copyright (C) 2005-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -86,10 +86,10 @@ my @Tests =
      ['W92-2', "--date '1992-1-5' +%W", {OUT=>"00"}],
      ['W92-3', "--date '1992-1-6' +%W", {OUT=>"01"}],
 
-     ['q-1', "--date '1000-1-1' +%q", {OUT=>"1"}],
-     ['q-2', "--date '1000-4-1' +%q", {OUT=>"2"}],
-     ['q-3', "--date '1000-7-1' +%q", {OUT=>"3"}],
-     ['q-4', "--date '1000-10-1' +%q", {OUT=>"4"}],
+     ['q-1', "--date '2016-1-1' +%q", {OUT=>"1"}],
+     ['q-2', "--date '2016-4-1' +%q", {OUT=>"2"}],
+     ['q-3', "--date '2016-7-1' +%q", {OUT=>"3"}],
+     ['q-4', "--date '2016-10-1' +%q", {OUT=>"4"}],
 
      ['millen-1', "--date '1998-1-1 3 years' +%Y", {OUT=>"2001"}],
 
@@ -290,6 +290,12 @@ my @Tests =
      ['invalid-TZ-crash', "-d 'TZ=\"\"\"'",
       {ERR => "date: invalid date 'TZ=\"\"\"'\n"},
       {EXIT => 1},
+     ],
+
+     # https://bugs.debian.org/851934#10
+     ['cross-TZ-mishandled', "-d 'TZ=\"EST5\" 1970-01-01 00:00'",
+      {ENV => 'TZ=PST8'},
+      {OUT => 'Wed Dec 31 21:00:00 PST 1969'},
      ],
     );
 

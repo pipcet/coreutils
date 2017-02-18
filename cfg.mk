@@ -1,5 +1,5 @@
 # Customize maint.mk                           -*- makefile -*-
-# Copyright (C) 2003-2016 Free Software Foundation, Inc.
+# Copyright (C) 2003-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,6 +20,9 @@ manual_title = Core GNU utilities
 # Use the direct link.  This is guaranteed to work immediately, while
 # it can take a while for the faster mirror links to become usable.
 url_dir_list = http://ftp.gnu.org/gnu/$(PACKAGE)
+
+# Exclude bundled external projects from syntax checks
+VC_LIST_ALWAYS_EXCLUDE_REGEX = src/blake2/.*$$
 
 # Tests not to run as part of "make distcheck".
 local-checks-to-skip = \
@@ -45,7 +48,7 @@ export VERBOSE = yes
 # 4914152 9e
 export XZ_OPT = -8e
 
-old_NEWS_hash = 4cdc662ed636425161a383b9aa85b2eb
+old_NEWS_hash = 46e9780e1ed2f2df9611205e5e08b95a
 
 # Add an exemption for sc_makefile_at_at_check.
 _makefile_at_at_check_exceptions = ' && !/^cu_install_prog/ && !/dynamic-dep/'
@@ -507,6 +510,14 @@ sc_prohibit_and_fail_1:
 	in_vc_files='^tests/'						\
 	  $(_sc_search_regexp)
 
+# Ensure that env vars are not passed through returns_ as
+# that was seen to fail on FreeBSD /bin/sh at least
+sc_prohibit_env_returns:
+	@prohibit='=[^ ]* returns_ '					\
+	halt='Passing env vars to returns_ is non portable'		\
+	in_vc_files='^tests/'						\
+	  $(_sc_search_regexp)
+
 # The mode part of a setfacl -m option argument must be three bytes long.
 # I.e., an argument of user:bin:rw or user:bin:r will make Solaris 10's
 # setfacl reject it with: "Unrecognized character found in mode field".
@@ -767,7 +778,7 @@ sc_fs-magic-compare:
 # Ensure gnulib generated files are ignored
 # TODO: Perhaps augment gnulib-tool to do this in lib/.gitignore?
 sc_gitignore_missing:
-	@{ sed -n '/^\/lib\/.*\.h$$/{p;p}' .gitignore;			\
+	@{ sed -n '/^\/lib\/.*\.h$$/{p;p}' $(srcdir)/.gitignore;	\
 	    find lib -name '*.in*' ! -name '*~' ! -name 'sys_*' |	\
 	      sed 's|^|/|; s|_\(.*in\.h\)|/\1|; s/\.in//'; } |		\
 	      sort | uniq -u | grep . && { echo '$(ME): Add above'	\
@@ -775,7 +786,8 @@ sc_gitignore_missing:
 
 # Flag redundant entries in .gitignore
 sc_gitignore_redundant:
-	@{ grep ^/lib .gitignore; sed 's|^|/lib|' lib/.gitignore; } |	\
+	@{ grep ^/lib $(srcdir)/.gitignore;				\
+	   sed 's|^|/lib|' $(srcdir)/lib/.gitignore; } |		\
 	    sort | uniq -d | grep . && { echo '$(ME): Remove above'	\
 	      'entries from .gitignore' >&2; exit 1; } || :
 

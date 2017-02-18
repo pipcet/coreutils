@@ -2,6 +2,58 @@ GNU coreutils NEWS                                    -*- outline -*-
 
 * Noteworthy changes in release ?.? (????-??-??) [?]
 
+** Improvements
+
+  If the file B already exists, commands like 'ln -f A B' and
+  'cp -fl A B' no longer remove B before creating the new link.
+  That is, there is no longer a brief moment when B does not exist.
+
+** Bug fixes
+
+  date again converts from a specified time zone.  Previously output was
+  not converted to the local time zone, and remained in the specified one.
+  [bug introduced in coreutils-8.26]
+
+  Commands like 'cp --no-dereference -l A B' are no longer quiet no-ops
+  when A is a regular file and B is a symbolic link that points to A.
+  [bug introduced in fileutils-4.0]
+
+  factor no longer goes into an infinite loop for certain numbers like
+  158909489063877810457 and 222087527029934481871.
+  [bug introduced in coreutils-8.20]
+
+  tail no longer prints redundant file headers with interleaved inotify events,
+  which could be triggered especially when tail was suspended and resumed.
+  [bug introduced with inotify support added in coreutils-7.5]
+
+  timeout no longer has a race that may terminate the wrong process.
+  The race is unlikely, as timeout(1) needs to receive a signal right
+  after the command being monitored finishes.  Also the system needs
+  to have reallocated that command's pid in that short time window.
+  [bug introduced when timeout was added in coreutils-7.0]
+
+  wc --bytes --files0-from now correctly reports byte counts.
+  Previously it may have returned values that were too large,
+  depending on the size of the first file processed.
+  [bug introduced in coreutils-8.24]
+
+** Improvements
+
+  The new 'date' option --rfc-email is now the long form for -R.
+  The new option spelling is intended to avoid the need to track the
+  Internet RFC number for email dates (currently RFC 5322).  The old
+  option spellings --rfc-2822 and --rfc-822 still work.
+
+  date now outputs "-00" for a numeric time zone if the time is UTC
+  and the time zone abbreviation begins with "-", indicating that the
+  time zone is indeterminate.
+
+  stty now validates arguments before interacting with the device,
+  ensuring there are no side effects to specifying an invalid option.
+
+
+* Noteworthy changes in release 8.26 (2016-11-30) [stable]
+
 ** Bug fixes
 
   cp, mv, and install no longer run into undefined behavior when
@@ -25,6 +77,14 @@ GNU coreutils NEWS                                    -*- outline -*-
   factor again outputs immediately when numbers are input interactively.
   [bug introduced in coreutils-8.24]
 
+  head no longer tries to process non-seekable input as seekable,
+  which resulted in failures on FreeBSD 11 at least.
+  [bug introduced in coreutils-8.24]
+
+  install -DZ and mkdir -pZ now set default SELinux context correctly even if
+  two or more directories nested in each other are created and each of them
+  defaults to a different SELinux context.
+
   ls --time-style no longer mishandles '%%b' in formats.
   [bug introduced in coreutils-7.2]
 
@@ -34,6 +94,10 @@ GNU coreutils NEWS                                    -*- outline -*-
 
   nl now resets numbering for each page section rather than just for each page.
   [This bug was present in "the beginning".]
+
+  pr now handles specified separator strings containing tabs correctly.
+  Previously it would have output random data from memory.
+  [This bug was detected with ASAN and present in "the beginning".]
 
   sort -h -k now works even in locales that use blank as thousands separator.
 
@@ -45,6 +109,9 @@ GNU coreutils NEWS                                    -*- outline -*-
 
   seq now immediately exits upon write errors.
   [This bug was present in "the beginning".]
+
+  tac no longer crashes when there are issues reading from non-seekable inputs.
+  [bug introduced in coreutils-8.15]
 
   tail -F now continues to process initially untailable files that are replaced
   by a tailable file.  This was handled correctly when inotify was available,
@@ -77,7 +144,7 @@ GNU coreutils NEWS                                    -*- outline -*-
   seq no longer accepts 0 value as increment, and now also rejects NaN
   values for any argument.
 
-  stat now outputs nanosecond information for time stamps even if
+  stat now outputs nanosecond information for timestamps even if
   they are out of localtime range.
 
   sort, tail, and uniq now support traditional usage like 'sort +2'
@@ -90,21 +157,40 @@ GNU coreutils NEWS                                    -*- outline -*-
   df now filters the system mount list more efficiently, with 20000
   mount entries now being processed in about 1.1s compared to 1.7s.
 
+  du, shuf, sort, and uniq no longer fail to process a specified file
+  when their stdin is closed, which would have happened with glibc >= 2.14.
+
   install -Z now also sets the default SELinux context for created directories.
 
   ls is now fully responsive to signals until the first escape sequence is
   written to a terminal.
 
-  stat and tail now know about "prl_fs" (a parallels file system),
-  "m1fs" (a Plexistor file system), "wslfs" (Windows Subsystem for Linux),
-  and "smb2".  stat -f --format=%T now reports the file system type, and
-  tail -f uses polling for "prl_fs" and "smb2", inotify for "m1fs",
-  and attempts inotify for "wslfs".
+  ls now aligns quoted items with non quoted items, which is easier to read,
+  and also better indicates that the quote is not part of the actual name.
+
+  stat and tail now know about these file systems:
+    "balloon-kvm-fs"    KVM dynamic RAM allocation support,
+    "cgroup2"           Linux Control Groups V2 support,
+    "daxfs"             Optical media file system,
+    "m1fs"              A Plexistor file system,
+    "prl_fs"            A parallels file system,
+    "smb2"              Samba for SMB protocol V2,
+    "wslfs"             Windows Subsystem for Linux,
+    "zsmalloc"          Linux compressed swap support,
+  stat -f --format=%T now reports the file system type, and
+  tail -f uses polling for "prl_fs" and "smb2", and inotify for others.
 
   stat --format=%N for quoting file names now honors the
   same QUOTING_STYLE environment variable values as ls.
 
+** New programs
+
+  b2sum is added to support the BLAKE2 digest algorithm with
+  a similar interface to the existing md5sum and sha1sum, etc. commands.
+
 ** New Features
+
+  comm now accepts the --total option to output a summary at the end.
 
   date now accepts the --debug option, to annotate the parsed date string,
   display timezone information, and warn about potential misuse.
@@ -1439,7 +1525,7 @@ GNU coreutils NEWS                                    -*- outline -*-
 ** Bug fixes
 
   cp -u no longer does unnecessary copying merely because the source
-  has finer-grained time stamps than the destination.
+  has finer-grained timestamps than the destination.
 
   od now prints floating-point numbers without losing information, and
   it no longer omits spaces between floating-point columns in some cases.
@@ -1496,7 +1582,7 @@ GNU coreutils NEWS                                    -*- outline -*-
   stat's %X, %Y, and %Z directives once again print only the integer
   part of seconds since the epoch.  This reverts a change from
   coreutils-8.6, that was deemed unnecessarily disruptive.
-  To obtain a nanosecond-precision time stamp for %X use %.X;
+  To obtain a nanosecond-precision timestamp for %X use %.X;
   if you want (say) just 3 fractional digits, use %.3X.
   Likewise for %Y and %Z.
 
@@ -1943,7 +2029,7 @@ GNU coreutils NEWS                                    -*- outline -*-
 
 ** Bug fixes
 
-  cp, mv now ignore failure to preserve a symlink time stamp, when it is
+  cp, mv now ignore failure to preserve a symlink timestamp, when it is
   due to their running on a kernel older than what was implied by headers
   and libraries tested at configure time.
   [bug introduced in coreutils-7.5]
@@ -2059,7 +2145,7 @@ GNU coreutils NEWS                                    -*- outline -*-
   using copy-on-write (COW).  This is currently only supported within
   a btrfs file system.
 
-  cp now preserves time stamps on symbolic links, when possible
+  cp now preserves timestamps on symbolic links, when possible
 
   sort accepts a new option, --human-numeric-sort (-h): sort numbers
   while honoring human readable suffixes like KiB and MB etc.
@@ -3466,7 +3552,7 @@ GNU coreutils NEWS                                    -*- outline -*-
   expr now detects integer overflow when converting strings to integers,
   rather than silently wrapping around.
 
-  ls now refuses to generate time stamps containing more than 1000 bytes, to
+  ls now refuses to generate timestamps containing more than 1000 bytes, to
   foil potential denial-of-service attacks on hosts with very large stacks.
 
   "mkdir -m =+x dir" no longer ignores the umask when evaluating "+x",
@@ -3721,7 +3807,7 @@ GNU coreutils NEWS                                    -*- outline -*-
   done reading it.  This problem cannot occur unless '-m' is used.
 
   When outside the default POSIX locale, the 'who' and 'pinky'
-  commands now output time stamps like "2004-06-21 13:09" instead of
+  commands now output timestamps like "2004-06-21 13:09" instead of
   the traditional "Jun 21 13:09".
 
   pwd now works even when run from a working directory whose name
@@ -3731,10 +3817,10 @@ GNU coreutils NEWS                                    -*- outline -*-
   and -t is now a short name for their --target-directory option.
 
   cp -pu and mv -u (when copying) now don't bother to update the
-  destination if the resulting time stamp would be no newer than the
-  preexisting time stamp.  This saves work in the common case when
+  destination if the resulting timestamp would be no newer than the
+  preexisting timestamp.  This saves work in the common case when
   copying or moving multiple times to the same destination in a file
-  system with a coarse time stamp resolution.
+  system with a coarse timestamp resolution.
 
   cut accepts a new option, --complement, to complement the set of
   selected bytes, characters, or fields.
@@ -3780,7 +3866,7 @@ GNU coreutils NEWS                                    -*- outline -*-
 
     Dates like 'January 32' with out-of-range components are now rejected.
 
-    Dates can have fractional time stamps like 2004-02-27 14:19:13.489392193.
+    Dates can have fractional timestamps like 2004-02-27 14:19:13.489392193.
 
     Dates can be entered via integer counts of seconds since 1970 when
     prefixed by '@'.  For example, '@321' represents 1970-01-01 00:05:21 UTC.
@@ -3796,7 +3882,7 @@ GNU coreutils NEWS                                    -*- outline -*-
       TZ="America/New_York" date --date='TZ="Europe/Paris" 2004-10-31 06:30'
 
   'date' has a new option --iso-8601=ns that outputs
-  nanosecond-resolution time stamps.
+  nanosecond-resolution timestamps.
 
   echo -e '\xHH' now outputs a byte whose hexadecimal value is HH,
   for compatibility with bash.
@@ -3903,7 +3989,7 @@ GNU coreutils NEWS                                    -*- outline -*-
   'cp -d' now works as required even on systems like OSF V5.1 that
   declare stat and lstat as 'static inline' functions.
 
-  time stamps output by stat now include actual fractional seconds,
+  timestamps output by stat now include actual fractional seconds,
   when available -- or .0000000 for files without that information.
 
   seq no longer infloops when printing 2^31 or more numbers.
@@ -4461,14 +4547,14 @@ point at which the packages merged to form the coreutils:
 * ls -n now implies -l, as per POSIX.
 * ls can now display dates and times in one of four time styles:
 
-  - The 'full-iso' time style gives full ISO-style time stamps like
+  - The 'full-iso' time style gives full ISO-style timestamps like
     '2001-05-14 23:45:56.477817180 -0700'.
-  - The 'iso' time style gives ISO-style time stamps like '2001-05-14 '
+  - The 'iso' time style gives ISO-style timestamps like '2001-05-14 '
     and '05-14 23:45'.
-  - The 'locale' time style gives locale-dependent time stamps like
+  - The 'locale' time style gives locale-dependent timestamps like
     'touko  14  2001' and 'touko  14 23:45' (in a Finnish locale).
   - The 'posix-iso' time style gives traditional POSIX-locale
-    time stamps like 'May 14  2001' and 'May 14 23:45' unless the user
+    timestamps like 'May 14  2001' and 'May 14 23:45' unless the user
     specifies a non-POSIX locale, in which case it uses ISO-style dates.
     This is the default.
 
@@ -4575,7 +4661,7 @@ packages, see ./old/*/NEWS.
 
 ========================================================================
 
-Copyright (C) 2001-2016 Free Software Foundation, Inc.
+Copyright (C) 2001-2017 Free Software Foundation, Inc.
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.3 or

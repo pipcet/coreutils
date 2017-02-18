@@ -1,7 +1,7 @@
 #!/bin/sh
 # Ensure we handle i/o errors correctly in csplit
 
-# Copyright (C) 2015-2016 Free Software Foundation, Inc.
+# Copyright (C) 2015-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -66,9 +66,9 @@ gcc_shared_ k.c k.so \
 # Split the input, and force fwrite() failure -
 # the 'csplit' command should fail with exit code 1
 # (checked with 'returns_ 1 ... || fail=1')
-seq 10 \
-  | LD_PRELOAD=$LD_PRELOAD:./k.so returns_ 1 csplit - 1 4 2>out \
-  || fail=1
+seq 10 |
+(export LD_PRELOAD=$LD_PRELOAD:./k.so
+ returns_ 1 csplit - 1 4 2>out) || fail=1
 
 test -e preloaded || skip_ 'LD_PRELOAD interception failed'
 

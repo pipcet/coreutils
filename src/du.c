@@ -1,5 +1,5 @@
 /* du -- summarize disk usage
-   Copyright (C) 1988-2016 Free Software Foundation, Inc.
+   Copyright (C) 1988-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -81,8 +81,8 @@ struct duinfo
   /* Number of inodes in directory.  */
   uintmax_t inodes;
 
-  /* Latest time stamp found.  If tmax.tv_sec == TYPE_MINIMUM (time_t)
-     && tmax.tv_nsec < 0, no time stamp has been found.  */
+  /* Latest timestamp found.  If tmax.tv_sec == TYPE_MINIMUM (time_t)
+     && tmax.tv_nsec < 0, no timestamp has been found.  */
   struct timespec tmax;
 };
 
@@ -255,8 +255,8 @@ static enum time_type const time_types[] =
 ARGMATCH_VERIFY (time_args, time_types);
 
 /* 'full-iso' uses full ISO-style dates and times.  'long-iso' uses longer
-   ISO-style time stamps, though shorter than 'full-iso'.  'iso' uses shorter
-   ISO-style time stamps.  */
+   ISO-style timestamps, though shorter than 'full-iso'.  'iso' uses shorter
+   ISO-style timestamps.  */
 enum time_style
   {
     full_iso_time_style,       /* --time-style=full-iso */

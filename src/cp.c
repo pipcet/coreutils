@@ -1,5 +1,5 @@
 /* cp.c  -- file copying (main routines)
-   Copyright (C) 1989-2016 Free Software Foundation, Inc.
+   Copyright (C) 1989-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -771,6 +771,7 @@ cp_option_init (struct cp_options *x)
   x->hard_link = false;
   x->interactive = I_UNSPECIFIED;
   x->move_mode = false;
+  x->install_mode = false;
   x->one_file_system = false;
   x->reflink_mode = REFLINK_NEVER;
 
@@ -1153,11 +1154,6 @@ main (int argc, char **argv)
 
   if (x.recursive)
     x.copy_as_regular = copy_contents;
-
-  /* If --force (-f) was specified and we're in link-creation mode,
-     first remove any existing destination file.  */
-  if (x.unlink_dest_after_failed_open && (x.hard_link || x.symbolic_link))
-    x.unlink_dest_before_opening = true;
 
   /* Ensure -Z overrides -a.  */
   if ((x.set_security_context || scontext)

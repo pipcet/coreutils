@@ -1,6 +1,6 @@
 ## Process this file with automake to produce Makefile.in -*-Makefile-*-.
 
-## Copyright (C) 2007-2016 Free Software Foundation, Inc.
+## Copyright (C) 2007-2017 Free Software Foundation, Inc.
 
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -248,6 +248,7 @@ all_tests =					\
   tests/misc/date-next-dow.pl			\
   tests/misc/ptx-overrun.sh			\
   tests/misc/xstrtol.pl				\
+  tests/tail-2/overlay-headers.sh		\
   tests/tail-2/pid.sh				\
   tests/misc/od.pl				\
   tests/misc/od-endian.sh			\
@@ -296,6 +297,7 @@ all_tests =					\
   tests/misc/head-pos.sh			\
   tests/misc/head-write-error.sh		\
   tests/misc/kill.sh				\
+  tests/misc/b2sum.sh				\
   tests/misc/md5sum.pl				\
   tests/misc/md5sum-bsd.sh			\
   tests/misc/md5sum-newline.pl			\
@@ -583,6 +585,7 @@ all_tests =					\
   tests/ls/no-arg.sh				\
   tests/ls/no-cap.sh				\
   tests/ls/proc-selinux-segfault.sh		\
+  tests/ls/quote-align.sh			\
   tests/ls/readdir-mountpoint-inode.sh		\
   tests/ls/recursive.sh				\
   tests/ls/root-rel-symlink-color.sh		\

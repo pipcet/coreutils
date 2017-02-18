@@ -1,6 +1,6 @@
 /* Bob Jenkins's cryptographic random number generators, ISAAC and ISAAC64.
 
-   Copyright (C) 1999-2016 Free Software Foundation, Inc.
+   Copyright (C) 1999-2017 Free Software Foundation, Inc.
    Copyright (C) 1997, 1998, 1999 Colin Plumb.
 
    This program is free software: you can redistribute it and/or modify
@@ -40,7 +40,7 @@
 /* If the platform supports unaligned access,
    then don't have -fsanitize=undefined warn about it.  */
 #undef ATTRIBUTE_NO_WARN_SANITIZE_UNDEFINED
-#if !_STRING_ARCH_unaligned \
+#if !(_STRING_ARCH_unaligned || _STRING_INLINE_unaligned) \
     || __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 9)
 # define ATTRIBUTE_NO_WARN_SANITIZE_UNDEFINED /* empty */
 #else

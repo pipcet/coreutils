@@ -1,5 +1,5 @@
 /* mv -- move or rename files
-   Copyright (C) 1986-2016 Free Software Foundation, Inc.
+   Copyright (C) 1986-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -114,6 +114,7 @@ cp_option_init (struct cp_options *x)
   x->hard_link = false;
   x->interactive = I_UNSPECIFIED;
   x->move_mode = true;
+  x->install_mode = false;
   x->one_file_system = false;
   x->preserve_ownership = true;
   x->preserve_links = true;

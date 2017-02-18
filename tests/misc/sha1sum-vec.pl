@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # Sample vectors for "sha1sum".
 
-# Copyright (C) 2000-2016 Free Software Foundation, Inc.
+# Copyright (C) 2000-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ use strict;
 @ENV{qw(LANGUAGE LANG LC_ALL)} = ('C') x 3;
 
 # The data from which these tests were derived came from here:
-# http://csrc.nist.gov/cryptval/shs/sha1-vectors.zip
+# http://web.archive.org/web/20060505234703/http://csrc.nist.gov/cryptval/shs/sha1-vectors.zip
 
 my @Tests =
     (

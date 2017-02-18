@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # Test pr.
 
-# Copyright (C) 2008-2016 Free Software Foundation, Inc.
+# Copyright (C) 2008-2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -466,6 +466,13 @@ push @Tests,
     {IN=>{2=>"m\tn\to\n"}},
     {IN=>{3=>"x\ty\tz\n"}},
      {OUT=>join("\t", qw(a b c m n o x y z)) . "\n"} ];
+
+# This resulted in reading invalid memory before coreutils-8.26
+push @Tests,
+   ['asan1', "-m -S'\t\t\t' -t",
+    {IN=>{1=>"a\n"}},
+    {IN=>{2=>"a\n"}},
+     {OUT=>"a\t\t\t\t  \t\t\ta\n"} ];
 
 @Tests = triple_test \@Tests;
 

@@ -1,7 +1,7 @@
 # Make coreutils programs.                             -*-Makefile-*-
 # This is included by the top-level Makefile.am.
 
-## Copyright (C) 1990-2016 Free Software Foundation, Inc.
+## Copyright (C) 1990-2017 Free Software Foundation, Inc.
 
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -328,7 +328,9 @@ copy_sources = \
   src/copy.c \
   src/cp-hash.c \
   src/extent-scan.c \
-  src/extent-scan.h
+  src/extent-scan.h \
+  src/force-link.c \
+  src/force-link.h
 
 # Use 'ginstall' in the definition of PROGRAMS and in dependencies to avoid
 # confusion with the 'install' target.  The install rule transforms 'ginstall'
@@ -357,7 +359,9 @@ src_vdir_SOURCES = src/ls.c src/ls-vdir.c
 src_id_SOURCES = src/id.c src/group-list.c
 src_groups_SOURCES = src/groups.c src/group-list.c
 src_ls_SOURCES = src/ls.c src/ls-ls.c
-src_ln_SOURCES = src/ln.c src/relpath.c src/relpath.h
+src_ln_SOURCES = src/ln.c \
+  src/force-link.c src/force-link.h \
+  src/relpath.c src/relpath.h
 src_chown_SOURCES = src/chown.c src/chown-core.c
 src_chgrp_SOURCES = src/chgrp.c src/chown-core.c
 src_kill_SOURCES = src/kill.c src/operand2sig.c
@@ -393,6 +397,12 @@ src_sha384sum_SOURCES = src/md5sum.c
 src_sha384sum_CPPFLAGS = -DHASH_ALGO_SHA384=1 $(AM_CPPFLAGS)
 src_sha512sum_SOURCES = src/md5sum.c
 src_sha512sum_CPPFLAGS = -DHASH_ALGO_SHA512=1 $(AM_CPPFLAGS)
+src_b2sum_CPPFLAGS = -include config.h -DHASH_ALGO_BLAKE2=1 \
+		     $(AM_CPPFLAGS)
+src_b2sum_SOURCES = src/md5sum.c \
+		    src/blake2/blake2.h src/blake2/blake2-impl.h \
+		    src/blake2/blake2b-ref.c \
+		    src/blake2/b2sum.c src/blake2/b2sum.h
 
 src_base64_CPPFLAGS = -DBASE_TYPE=64 $(AM_CPPFLAGS)
 src_base32_SOURCES = src/base64.c
@@ -639,8 +649,8 @@ check-duplicate-no-install: src/tr
 
 # Use the just-built 'ginstall', when not cross-compiling.
 if CROSS_COMPILING
-cu_install_program = @INSTALL_PROGRAM@
+cu_install_program = @INSTALL@
 else
 cu_install_program = src/ginstall
 endif
-INSTALL_PROGRAM = $(cu_install_program)
+INSTALL = $(cu_install_program) -c

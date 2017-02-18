@@ -1,5 +1,5 @@
 /* install - copy files and set attributes
-   Copyright (C) 1989-2016 Free Software Foundation, Inc.
+   Copyright (C) 1989-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -271,6 +271,7 @@ cp_option_init (struct cp_options *x)
   x->hard_link = false;
   x->interactive = I_UNSPECIFIED;
   x->move_mode = false;
+  x->install_mode = true;
   x->one_file_system = false;
   x->preserve_ownership = false;
   x->preserve_links = false;
@@ -426,7 +427,7 @@ static int
 make_ancestor (char const *dir, char const *component, void *options)
 {
   struct cp_options const *x = options;
-  if (x->set_security_context && defaultcon (dir, S_IFDIR) < 0
+  if (x->set_security_context && defaultcon (component, S_IFDIR) < 0
       && ! ignorable_ctx_err (errno))
     error (0, errno, _("failed to set default creation context for %s"),
            quoteaf (dir));
@@ -530,7 +531,7 @@ change_timestamps (struct stat const *src_sb, char const *dest)
 
   if (utimens (dest, timespec))
     {
-      error (0, errno, _("cannot set time stamps for %s"), quoteaf (dest));
+      error (0, errno, _("cannot set timestamps for %s"), quoteaf (dest));
       return false;
     }
   return true;

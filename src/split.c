@@ -1,5 +1,5 @@
 /* split.c -- split a file into pieces.
-   Copyright (C) 1988-2016 Free Software Foundation, Inc.
+   Copyright (C) 1988-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@
 #include "quote.h"
 #include "safe-read.h"
 #include "sig2str.h"
-#include "xfreopen.h"
+#include "xbinary-io.h"
 #include "xdectoint.h"
 #include "xstrtol.h"
 
@@ -982,7 +982,7 @@ bytes_chunk_extract (uintmax_t k, uintmax_t n, char *buf, size_t bufsize,
   start = (k - 1) * (file_size / n);
   end = (k == n) ? file_size : k * (file_size / n);
 
-  if (initial_read != SIZE_MAX || start < initial_read)
+  if (start < initial_read)
     {
       memmove (buf, buf + start, initial_read - start);
       initial_read -= start;
@@ -1553,8 +1553,7 @@ main (int argc, char **argv)
          quoteaf (infile));
 
   /* Binary I/O is safer when byte counts are used.  */
-  if (O_BINARY && ! isatty (STDIN_FILENO))
-    xfreopen (NULL, "rb", stdin);
+  xset_binary_mode (STDIN_FILENO, O_BINARY);
 
   /* Get the optimal block size of input device and make a buffer.  */
 

@@ -1,5 +1,5 @@
 /* mkdir -- make directories
-   Copyright (C) 1990-2016 Free Software Foundation, Inc.
+   Copyright (C) 1990-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -123,7 +123,7 @@ make_ancestor (char const *dir, char const *component, void *options)
 {
   struct mkdir_options const *o = options;
 
-  if (o->set_security_context && defaultcon (dir, S_IFDIR) < 0
+  if (o->set_security_context && defaultcon (component, S_IFDIR) < 0
       && ! ignorable_ctx_err (errno))
     error (0, errno, _("failed to set default creation context for %s"),
            quoteaf (dir));

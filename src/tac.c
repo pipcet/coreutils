@@ -1,5 +1,5 @@
 /* tac - concatenate and print files in reverse
-   Copyright (C) 1988-2016 Free Software Foundation, Inc.
+   Copyright (C) 1988-2017 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ tac -r -s '.\|
 #include "filenamecat.h"
 #include "safe-read.h"
 #include "stdlib--.h"
-#include "xfreopen.h"
+#include "xbinary-io.h"
 
 /* The official name of this program (e.g., no 'g' prefix).  */
 #define PROGRAM_NAME "tac"
@@ -477,6 +477,7 @@ temp_stream (FILE **fp, char **file_name)
     }
   else
     {
+      clearerr (tmp_fp);
       if (fseeko (tmp_fp, 0, SEEK_SET) < 0
           || ftruncate (fileno (tmp_fp), 0) < 0)
         {
@@ -512,13 +513,13 @@ copy_to_temp (FILE **g_tmp, char **g_tempfile, int input_fd, char const *file)
       if (bytes_read == SAFE_READ_ERROR)
         {
           error (0, errno, _("%s: read error"), quotef (file));
-          goto Fail;
+          return -1;
         }
 
       if (fwrite (G_buffer, 1, bytes_read, fp) != bytes_read)
         {
           error (0, errno, _("%s: write error"), quotef (file_name));
-          goto Fail;
+          return -1;
         }
 
       /* Implicitly <= OFF_T_MAX due to preceding fwrite(),
@@ -530,16 +531,12 @@ copy_to_temp (FILE **g_tmp, char **g_tempfile, int input_fd, char const *file)
   if (fflush (fp) != 0)
     {
       error (0, errno, _("%s: write error"), quotef (file_name));
-      goto Fail;
+      return -1;
     }
 
   *g_tmp = fp;
   *g_tempfile = file_name;
   return bytes_copied;
-
- Fail:
-  fclose (fp);
-  return -1;
 }
 
 /* Copy INPUT_FD to a temporary, then tac that file.
@@ -575,8 +572,7 @@ tac_file (const char *filename)
       have_read_stdin = true;
       fd = STDIN_FILENO;
       filename = _("standard input");
-      if (O_BINARY && ! isatty (STDIN_FILENO))
-        xfreopen (NULL, "rb", stdin);
+      xset_binary_mode (STDIN_FILENO, O_BINARY);
     }
   else
     {
@@ -691,8 +687,7 @@ main (int argc, char **argv)
           ? (char const *const *) &argv[optind]
           : default_file_list);
 
-  if (O_BINARY && ! isatty (STDOUT_FILENO))
-    xfreopen (NULL, "wb", stdout);
+  xset_binary_mode (STDOUT_FILENO, O_BINARY);
 
   {
     size_t i;
