@@ -3243,6 +3243,12 @@ suffixes beyond @samp{99}.  Note if option @option{--number} is specified and
 the number of files is less than @var{from}, a single run is assumed and the
 minimum suffix length required is automatically determined.
 
+@item -x
+@itemx --hex-suffixes[=@var{from}]
+@opindex -x
+@opindex --hex-suffixes
+Like @option{--numeric-suffixes}, but use hexadecimal numbers (in lower case).
+
 @item --additional-suffix=@var{suffix}
 @opindex --additional-suffix
 Append an additional @var{suffix} to output file names.  @var{suffix}
@@ -3818,16 +3824,19 @@ as the length is automatically determined when checking.
 @command{md5sum} computes a 128-bit checksum (or @dfn{fingerprint} or
 @dfn{message-digest}) for each specified @var{file}.
 
-Note: The MD5 digest is more reliable than a simple CRC (provided by
+@macro weakHash{hash}
+Note: The \hash\ digest is more reliable than a simple CRC (provided by
 the @command{cksum} command) for detecting accidental file corruption,
-as the chances of accidentally having two files with identical MD5
+as the chances of accidentally having two files with identical \hash\
 are vanishingly small.  However, it should not be considered secure
-against malicious tampering: although finding a file with a given MD5
+against malicious tampering: although finding a file with a given \hash\
 fingerprint is considered infeasible at the moment, it is known how
 to modify certain files, including digital certificates, so that they
-appear valid when signed with an MD5 digest.  For more secure hashes,
+appear valid when signed with an \hash\ digest.  For more secure hashes,
 consider using SHA-2, or the newer @command{b2sum} command.
 @xref{sha2 utilities}. @xref{b2sum invocation}.
+@end macro
+@weakHash{MD5}
 
 If a @var{file} is specified as @samp{-} or if no files are given
 @command{md5sum} computes the checksum for the standard input.
@@ -3979,12 +3988,7 @@ exit nonzero after all warnings have been issued.
 @var{file}.  The usage and options of this command are precisely the
 same as for @command{md5sum}.  @xref{md5sum invocation}.
 
-Note: The SHA-1 digest is more secure than MD5, and no collisions of
-it are known (different files having the same fingerprint).  However,
-it is known that they can be produced with considerable, but not
-unreasonable, resources.  For this reason, it is generally considered
-that SHA-1 should be gradually phased out in favor of the more secure
-SHA-2 hash algorithms.  @xref{sha2 utilities}.
+@weakHash{SHA-1}
 
 
 @node sha2 utilities
@@ -5937,9 +5941,9 @@ By default @command{awk} uses (and discards) runs of blank characters
 to separate fields, and ignores leading and trailing blanks.
 @example
 @verbatim
-awk '{print $2}'    # print the second field
-awk '{print $NF-1}' # print the penultimate field
-awk '{print $2,$1}' # reorder the first two fields
+awk '{print $2}'      # print the second field
+awk '{print $(NF-1)}' # print the penultimate field
+awk '{print $2,$1}'   # reorder the first two fields
 @end verbatim
 @end example
 Note while @command{cut} accepts field specifications in
@@ -6113,48 +6117,27 @@ Either @var{file1} or @var{file2} (but not both) can be @samp{-},
 meaning standard input.  @var{file1} and @var{file2} should be
 sorted on the join fields.
 
-@vindex LC_COLLATE
-Normally, the sort order is that of the
-collating sequence specified by the @env{LC_COLLATE} locale.  Unless
-the @option{-t} option is given, the sort comparison ignores blanks at
-the start of the join field, as in @code{sort -b}.  If the
-@option{--ignore-case} option is given, the sort comparison ignores
-the case of characters in the join field, as in @code{sort -f}.
-
-The @command{sort} and @command{join} commands should use consistent
-locales and options if the output of @command{sort} is fed to
-@command{join}.  You can use a command like @samp{sort -k 1b,1} to
-sort a file on its default join field, but if you select a non-default
-locale, join field, separator, or comparison options, then you should
-do so consistently between @command{join} and @command{sort}.
-If @samp{join -t ''} is specified then the whole line is considered which
-matches the default operation of sort.
-
-If the input has no unpairable lines, a GNU extension is
-available; the sort order can be any order that considers two fields
-to be equal if and only if the sort comparison described above
-considers them to be equal.  For example:
-
 @example
+@group
 $ cat file1
-a a1
-c c1
-b b1
+a 1
+b 2
+e 5
+
 $ cat file2
-a a2
-c c2
-b b2
+a X
+e Y
+f Z
+
 $ join file1 file2
-a a1 a2
-c c1 c2
-b b1 b2
+a 1 X
+e 5 Z
+@end group
 @end example
 
-@set JOIN_COMMAND
-@checkOrderOption{join}
-@clear JOIN_COMMAND
 
-The defaults are:
+@noindent
+@command{join}'s default behavior (when no options are given):
 @itemize
 @item the join field is the first field in each line;
 @item fields in the input are separated by one or more blanks, with leading
@@ -6164,6 +6147,18 @@ blanks on the line ignored;
 fields from @var{file1}, then the remaining fields from @var{file2}.
 @end itemize
 
+
+@menu
+* General options in join::      Options which affect general program behavior.
+* Sorting files for join::       Using @command{sort} before @command{join}.
+* Working with fields::          Joining on different fields.
+* Paired and unpaired lines::    Controlling @command{join}'s field matching.
+* Header lines::                 Working with header lines in files.
+* Set operations::               Union, Intersection and Difference of files.
+@end menu
+
+@node General options in join
+@subsection General options
 The program accepts the following options.  Also see @ref{Common options}.
 
 @table @samp
@@ -6263,6 +6258,369 @@ Print a line for each unpairable line in file @var{file-number}
 @end table
 
 @exitstatus
+
+@set JOIN_COMMAND
+@checkOrderOption{join}
+@clear JOIN_COMMAND
+
+
+
+@node Sorting files for join
+@subsection Pre-sorting
+
+@command{join} requires sorted input files. Each input file should be
+sorted according to the key (=field/column number) used in
+@command{join}. The recommended sorting option is @samp{sort -k 1b,1}
+(assuming the desired key is in the first column).
+
+@noindent Typical usage:
+@example
+@group
+$ sort -k 1b,1 file1 > file1.sorted
+$ sort -k 1b,1 file2 > file2.sorted
+$ join file1.sorted file2.sorted > file3
+@end group
+@end example
+
+@vindex LC_COLLATE
+Normally, the sort order is that of the
+collating sequence specified by the @env{LC_COLLATE} locale.  Unless
+the @option{-t} option is given, the sort comparison ignores blanks at
+the start of the join field, as in @code{sort -b}.  If the
+@option{--ignore-case} option is given, the sort comparison ignores
+the case of characters in the join field, as in @code{sort -f}:
+
+@example
+@group
+$ sort -k 1bf,1 file1 > file1.sorted
+$ sort -k 1bf,1 file2 > file2.sorted
+$ join --ignore-case file1.sorted file2.sorted > file3
+@end group
+@end example
+
+The @command{sort} and @command{join} commands should use consistent
+locales and options if the output of @command{sort} is fed to
+@command{join}.  You can use a command like @samp{sort -k 1b,1} to
+sort a file on its default join field, but if you select a non-default
+locale, join field, separator, or comparison options, then you should
+do so consistently between @command{join} and @command{sort}.
+
+@noindent To avoid any locale-related issues, it is recommended to use the
+@samp{C} locale for both commands:
+
+@example
+@group
+$ LC_ALL=C sort -k 1b,1 file1 > file1.sorted
+$ LC_ALL=C sort -k 1b,1 file2 > file2.sorted
+$ LC_ALL=C join file1.sorted file2.sorted > file3
+@end group
+@end example
+
+
+@node Working with fields
+@subsection Working with fields
+
+Use @option{-1},@option{-2} to set the key fields for each of the input files.
+Ensure the preceding @command{sort} commands operated on the same fields.
+
+@noindent
+The following example joins two files, using the values from seventh field
+of the first file and the third field of the second file:
+
+@example
+@group
+$ sort -k 7b,7 file1 > file1.sorted
+$ sort -k 3b,3 file2 > file2.sorted
+$ join -1 7 -2 3 file1.sorted file2.sorted > file3
+@end group
+@end example
+
+@noindent
+If the field number is the same for both files, use @option{-j}:
+
+@example
+@group
+$ sort -k4b,4 file1 > file1.sorted
+$ sort -k4b,4 file2 > file2.sorted
+$ join -j4    file1.sorted file2.sorted > file3
+@end group
+@end example
+
+@noindent
+Both @command{sort} and @command{join} operate of whitespace-delimited
+fields. To specify a different delimiter, use @option{-t} in @emph{both}:
+
+@example
+@group
+$ sort -t, -k3b,3 file1 > file1.sorted
+$ sort -t, -k3b,3 file2 > file2.sorted
+$ join -t, -j3    file1.sorted file2.sorted > file3
+@end group
+@end example
+
+@noindent
+To specify a tab (@sc{ascii} 0x09) character instead of whitespace, use
+@footnote{the @code{$'\t'} is supported in most modern shells.
+For older shells, use a literal tab}:
+
+@example
+@group
+$ sort -t$'\t' -k3b,3 file1 > file1.sorted
+$ sort -t$'\t' -k3b,3 file2 > file2.sorted
+$ join -t$'\t' -j3    file1.sorted file2.sorted > file3
+@end group
+@end example
+
+
+@noindent
+If @samp{join -t ''} is specified then the whole line is considered which
+matches the default operation of sort:
+
+@example
+@group
+$ sort file1 > file1.sorted
+$ sort file2 > file2.sorted
+$ join -t'' file1.sorted file2.sorted > file3
+@end group
+@end example
+
+
+@node Paired and unpaired lines
+@subsection Controlling @command{join}'s field matching
+
+In this section the @command{sort} commands are omitted for brevity.
+Sorting the files before joining is still required.
+
+@command{join}'s default behavior is to print only lines common to
+both input files. Use @option{-a} and @option{-v} to print unpairable lines
+from one or both files.
+
+@noindent
+All examples below use the following two (pre-sorted) input files:
+
+@multitable @columnfractions .5 .5
+@item
+@example
+$ cat file1
+a 1
+b 2
+@end example
+
+@tab
+@example
+$ cat file2
+a A
+c C
+@end example
+@end multitable
+
+
+@c TODO: Find better column widths that work for both HTML and PDF
+@c       and disable indentation of @example.
+@multitable @columnfractions 0.5 0.5
+
+@headitem Command @tab Outcome
+
+
+@item
+@example
+$ join file1 file2
+a 1 A
+@end example
+@tab
+common lines
+(@emph{intersection})
+
+
+
+@item
+@example
+$ join -a 1 file1 file2
+a 1 A
+b 2
+@end example
+@tab
+common lines @emph{and} unpaired
+lines from the first file
+
+
+@item
+@example
+$ join -a 2 file1 file2
+a 1 A
+c C
+@end example
+@tab
+common lines @emph{and} unpaired lines from the second file
+
+
+@item
+@example
+$ join -a 1 -a 2 file1 file2
+a 1 A
+b 2
+c C
+@end example
+@tab
+all lines (paired and unpaired) from both files
+(@emph{union}).
+@*
+see note below regarding @code{-o auto}.
+
+
+@item
+@example
+$ join -v 1 file1 file2
+b 1
+@end example
+@tab
+unpaired lines from the first file
+(@emph{difference})
+
+
+@item
+@example
+$ join -v 2 file1 file2
+c C
+@end example
+@tab
+unpaired lines from the second file
+(@emph{difference})
+
+
+@item
+@example
+$ join -v 1 -v 2 file1 file2
+b 2
+c C
+@end example
+@tab
+unpaired lines from both files, omitting common lines
+(@emph{symmetric difference}).
+
+
+@end multitable
+
+@noindent
+The @option{-o auto -e X} options are useful when dealing with unpaired lines.
+The following example prints all lines (common and unpaired) from both files.
+Without @option{-o auto} it is not easy to discern which fields originate from
+which file:
+
+@example
+$ join -a 1 -a 2 file1 file2
+a 1 A
+b 2
+c C
+
+$ join -o auto -e X -a 1 -a 2 file1 file2
+a 1 A
+b 2 X
+c X C
+@end example
+
+
+If the input has no unpairable lines, a GNU extension is
+available; the sort order can be any order that considers two fields
+to be equal if and only if the sort comparison described above
+considers them to be equal.  For example:
+
+@example
+@group
+$ cat file1
+a a1
+c c1
+b b1
+
+$ cat file2
+a a2
+c c2
+b b2
+$ join file1 file2
+a a1 a2
+c c1 c2
+b b1 b2
+@end group
+@end example
+
+
+@node Header lines
+@subsection Header lines
+
+The @option{--header} option can be used when the files to join
+have a header line which is not sorted:
+
+@example
+@group
+$ cat file1
+Name     Age
+Alice    25
+Charlie  34
+
+$ cat file2
+Name   Country
+Alice  France
+Bob    Spain
+
+$ join --header -o auto -e NA -a1 -a2 file1 file2
+Name     Age   Country
+Alice    25    France
+Bob      NA    Spain
+Charlie  34    NA
+@end group
+@end example
+
+
+To sort a file with a header line, use GNU @command{sed -u}.
+The following example sort the files but keeps the first line of each
+file in place:
+
+@example
+@group
+$ ( sed -u 1q ; sort -k2b,2 ) < file1 > file1.sorted
+$ ( sed -u 1q ; sort -k2b,2 ) < file2 > file2.sorted
+$ join --header -o auto -e NA -a1 -a2 file1.sorted file2.sorted > file3
+@end group
+@end example
+
+@node Set operations
+@subsection Union, Intersection and Difference of files
+
+Combine @command{sort}, @command{uniq} and @command{join} to
+perform the equivalent of set operations on files:
+
+@c From https://www.pixelbeat.org/cmdline.html#sets
+@multitable @columnfractions 0.5 0.5
+@headitem Command @tab outcome
+@item @code{sort -u file1 file2}
+@tab Union of unsorted files
+
+@item @code{sort file1 file2 | uniq -d}
+@tab Intersection of unsorted files
+
+@item @code{sort file1 file1 file2 | uniq}
+@tab Difference of unsorted files
+
+@item @code{sort file1 file2 | uniq -u}
+@tab Symmetric Difference of unsorted files
+
+@item @code{join -t'' -a1 -a2 file1 file2}
+@tab Union of sorted files
+
+@item @code{join -t'' file1 file2}
+@tab Intersection of sorted files
+
+@item @code{join -t'' -v2 file1 file2}
+@tab Difference of sorted files
+
+@item @code{join -t'' -v1 -v2 file1 file2}
+@tab Symmetric Difference of sorted files
+
+@end multitable
+
+All examples above operate on entire lines and not on specific fields:
+@command{sort} without @option{-k} and @command{join -t''} both consider
+entire lines as the key.
 
 
 @node Operating on characters
@@ -6695,8 +7053,24 @@ The program accepts the following options.  Also see @ref{Common options}.
 If only one tab stop is given, set the tabs @var{tab1} spaces apart
 (default is 8).  Otherwise, set the tabs at columns @var{tab1},
 @var{tab2}, @dots{} (numbered from 0), and replace any tabs beyond the
-last tab stop given with single spaces.  Tab stops can be separated by
-blanks as well as by commas.
+last tab stop given with single spaces.
+@macro gnuExpandTabs
+Tab stops can be separated by blanks as well as by commas.
+
+As a GNU extension the last @var{tab} specified can be prefixed
+with a @samp{/} to indicate a tab size to use for remaining positions.
+For example, @option{--tabs=2,4,/8} will set tab stops at position 2 and 4,
+and every multiple of 8 after that.
+
+Also the last @var{tab} specified can be prefixed with a @samp{+} to indicate
+a tab size to use for remaining positions, offset from the final explicitly
+specified tab stop.
+For example, to ignore the 1 character gutter present in diff output,
+one can specify a 1 character offset using @option{--tabs=1,+8},
+which will set tab stops at positions 1,9,17,@dots{}
+@end macro
+@gnuExpandTabs
+
 
 For compatibility, GNU @command{expand} also accepts the obsolete
 option syntax, @option{-@var{t1}[,@var{t2}]@dots{}}.  New scripts
@@ -6748,8 +7122,10 @@ The program accepts the following options.  Also see @ref{Common options}.
 If only one tab stop is given, set the tabs @var{tab1} columns apart
 instead of the default 8.  Otherwise, set the tabs at columns
 @var{tab1}, @var{tab2}, @dots{} (numbered from 0), and leave blanks
-beyond the tab stops given unchanged.  Tab stops can be separated by
-blanks as well as by commas.  This option implies the @option{-a} option.
+beyond the tab stops given unchanged.
+@gnuExpandTabs
+
+This option implies the @option{-a} option.
 
 For compatibility, GNU @command{unexpand} supports the obsolete option syntax,
 @option{-@var{tab1}[,@var{tab2}]@dots{}}, where tab stops must be
@@ -14665,9 +15041,10 @@ Exit status:
 
 @display
 0 if standard input is a terminal
-1 if standard input is not a terminal
+1 if standard input is a non-terminal file
 2 if given incorrect arguments
 3 if a write error occurs
+4 if standard input is closed or its type cannot be determined
 @end display
 
 
@@ -15458,7 +15835,7 @@ date -d "$(LC_TIME=C date)"
 @cindex debugging date strings
 @cindex date strings, debugging
 @cindex arbitrary date strings, debugging
-annotate the parsed date, display the effective time zone, and warn about
+Annotate the parsed date, display the effective time zone, and warn about
 potential misuse.
 
 @item -f @var{datefile}
@@ -15808,8 +16185,9 @@ not rely on its existence.
 Print the number of processing units available to the current process,
 which may be less than the number of online processors.
 If this information is not accessible, then print the number of
-processors installed.  If the @env{OMP_NUM_THREADS} environment variable is
-set, then it will determine the returned value.  The result is guaranteed to be
+processors installed.  If the @env{OMP_NUM_THREADS} or @env{OMP_THREAD_LIMIT}
+environment variables are set, then they will determine the minimum
+and maximum returned value respectively.  The result is guaranteed to be
 greater than zero.  Synopsis:
 
 @example
@@ -15824,7 +16202,8 @@ The program accepts the following options.  Also see @ref{Common options}.
 @opindex --all
 Print the number of installed processors on the system, which may
 be greater than the number online or available to the current process.
-The @env{OMP_NUM_THREADS} environment variable is not honored in this case.
+The @env{OMP_NUM_THREADS} or @env{OMP_THREAD_LIMIT} environment variables
+are not honored in this case.
 
 @item --ignore=@var{number}
 @opindex --ignore
@@ -16205,7 +16584,14 @@ are interpreted as arguments to the command.
 With neither @var{context} nor @var{command}, print the current
 security context.
 
-The program accepts the following options.  Also see @ref{Common options}.
+@cindex restricted security context
+@cindex NO_NEW_PRIVS
+Note also the @command{setpriv} command which can be used to set the
+NO_NEW_PRIVS bit using @command{setpriv --no-new-privs runcon ...},
+thus disallowing usage of a security context with more privileges
+than the process would normally have.
+
+@command{runcon} accepts the following options.  Also see @ref{Common options}.
 
 @table @samp
 

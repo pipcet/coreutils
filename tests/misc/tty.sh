@@ -1,7 +1,7 @@
 #!/bin/sh
-# Ensure "mv --verbose --backup" works the same for dirs and non-dirs.
+# Test 'tty'.
 
-# Copyright (C) 2006-2017 Free Software Foundation, Inc.
+# Copyright 2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,19 +16,27 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# Make sure there's a tty on stdin.
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
-print_ver_ mv
+print_ver_ tty
 
-mkdir A B || framework_failure_
-touch X Y || framework_failure_
+if test -t 0; then
+  tty || fail=1
+  tty -s || fail=1
+fi
 
+returns_ 1 tty </dev/null || fail=1
+returns_ 1 tty -s </dev/null || fail=1
 
-# Before coreutils-6.2, the " (backup: 'B.~1~')" suffix was not printed.
-mv --verbose --backup=numbered -T A B > out || fail=1
-cat <<\EOF > exp || fail=1
-renamed 'A' -> 'B' (backup: 'B.~1~')
-EOF
+returns_ 2 tty a || fail=1
+returns_ 2 tty -s a || fail=1
 
-compare exp out || fail=1
+if test -w /dev/full && test -c /dev/full; then
+  returns_ 3 tty >/dev/full || fail=1
+  returns_ 3 tty </dev/null >/dev/full || fail=1
+fi
+
+returns_ 4 tty <&- 2>/dev/null || fail=1
+returns_ 4 tty -s <&- || fail=1
 
 Exit $fail

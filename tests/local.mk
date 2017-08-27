@@ -176,6 +176,7 @@ all_tests =					\
   tests/tail-2/descriptor-vs-rename.sh		\
   tests/tail-2/inotify-rotate.sh		\
   tests/tail-2/inotify-rotate-resources.sh	\
+  tests/tail-2/inotify-dir-recreate.sh		\
   tests/chmod/no-x.sh				\
   tests/chgrp/basic.sh				\
   tests/rm/dangling-symlink.sh			\
@@ -282,6 +283,7 @@ all_tests =					\
   tests/misc/csplit-suppress-matched.pl		\
   tests/misc/date-debug.sh			\
   tests/misc/date-sec.sh			\
+  tests/misc/date-tz.sh				\
   tests/misc/dircolors.pl			\
   tests/misc/dirname.pl				\
   tests/misc/env-null.sh			\
@@ -309,6 +311,7 @@ all_tests =					\
   tests/misc/nohup.sh				\
   tests/misc/nproc-avail.sh			\
   tests/misc/nproc-positive.sh			\
+  tests/misc/nproc-override.sh			\
   tests/misc/numfmt.pl				\
   tests/misc/od-N.sh				\
   tests/misc/od-j.sh				\
@@ -414,6 +417,7 @@ all_tests =					\
   tests/misc/truncate-parameters.sh		\
   tests/misc/truncate-relative.sh		\
   tests/misc/tsort.pl				\
+  tests/misc/tty.sh				\
   tests/misc/unexpand.pl			\
   tests/misc/uniq.pl				\
   tests/misc/uniq-perf.sh			\

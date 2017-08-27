@@ -889,7 +889,7 @@ set_author (const char *dst_name, int dest_desc, const struct stat *src_sb)
    Based on CP_OPTIONS, diagnose warnings and fail when appropriate.
    Return FALSE on failure, TRUE on success.  */
 
-static bool
+bool
 set_process_security_ctx (char const *src_name, char const *dst_name,
                           mode_t mode, bool new_dst, const struct cp_options *x)
 {
@@ -951,7 +951,7 @@ set_process_security_ctx (char const *src_name, char const *dst_name,
    failure, when allowed by various settings in CP_OPTIONS.
    Return FALSE on failure, TRUE on success.  */
 
-static bool
+bool
 set_file_security_ctx (char const *dst_name, bool process_local,
                        bool recurse, const struct cp_options *x)
 {
@@ -2192,8 +2192,9 @@ copy_internal (char const *src_name, char const *dst_name,
 
   /* If the source is a directory, we don't always create the destination
      directory.  So --verbose should not announce anything until we're
-     sure we'll create a directory. */
-  if (x->verbose && !S_ISDIR (src_mode))
+     sure we'll create a directory.  Also don't announce yet when moving
+     so we can distinguish renames versus copies.  */
+  if (x->verbose && !x->move_mode && !S_ISDIR (src_mode))
     emit_verbose (src_name, dst_name, backup_succeeded ? dst_backup : NULL);
 
   /* Associate the destination file name with the source device and inode
@@ -2314,9 +2315,12 @@ copy_internal (char const *src_name, char const *dst_name,
     {
       if (rename (src_name, dst_name) == 0)
         {
-          if (x->verbose && S_ISDIR (src_mode))
-            emit_verbose (src_name, dst_name,
-                          backup_succeeded ? dst_backup : NULL);
+          if (x->verbose)
+            {
+              printf (_("renamed "));
+              emit_verbose (src_name, dst_name,
+                            backup_succeeded ? dst_backup : NULL);
+            }
 
           if (x->set_security_context)
             {
@@ -2417,6 +2421,12 @@ copy_internal (char const *src_name, char const *dst_name,
           return false;
         }
 
+      if (x->verbose && !S_ISDIR (src_mode))
+        {
+          printf (_("copied "));
+          emit_verbose (src_name, dst_name,
+                        backup_succeeded ? dst_backup : NULL);
+        }
       new_dst = true;
     }
 
@@ -2511,7 +2521,12 @@ copy_internal (char const *src_name, char const *dst_name,
             }
 
           if (x->verbose)
-            emit_verbose (src_name, dst_name, NULL);
+            {
+              if (x->move_mode)
+                printf (_("created directory %s\n"), quoteaf (dst_name));
+              else
+                emit_verbose (src_name, dst_name, NULL);
+            }
         }
       else
         {

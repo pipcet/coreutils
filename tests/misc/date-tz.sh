@@ -1,7 +1,7 @@
 #!/bin/sh
-# Ensure "mv --verbose --backup" works the same for dirs and non-dirs.
+# Verify TZ processing.
 
-# Copyright (C) 2006-2017 Free Software Foundation, Inc.
+# Copyright (C) 2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,18 +17,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
-print_ver_ mv
+print_ver_ date
 
-mkdir A B || framework_failure_
-touch X Y || framework_failure_
-
-
-# Before coreutils-6.2, the " (backup: 'B.~1~')" suffix was not printed.
-mv --verbose --backup=numbered -T A B > out || fail=1
-cat <<\EOF > exp || fail=1
-renamed 'A' -> 'B' (backup: 'B.~1~')
-EOF
-
-compare exp out || fail=1
+# coreutils-8.27 would overwrite the heap with large TZ values
+tz_long=$(printf '%2000s' | tr ' ' a)
+date -d "TZ=\"${tz_long}0\" 2017" || fail=1
 
 Exit $fail

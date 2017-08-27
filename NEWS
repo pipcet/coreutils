@@ -2,13 +2,55 @@ GNU coreutils NEWS                                    -*- outline -*-
 
 * Noteworthy changes in release ?.? (????-??-??) [?]
 
+** Bug fixes
+
+  date and touch no longer overwrite the heap with large
+  user specified TZ values (CVE-2017-7476).
+  [bug introduced in coreutils-8.27]
+
+  dd status=progress now just counts seconds; e.g., it outputs "6 s"
+  consistently rather than sometimes outputting "6.00001 s".
+  [bug introduced in coreutils-8.24]
+
+  df no longer interacts with excluded file system types, so for example
+  specifying -x nfs will no longer hang with problematic nfs mounts.
+  [bug introduced in coreutils-8.21]
+
+  split no longer exits when invocations of a --filter return EPIPE.
+  [bug introduced in coreutils-8.26]
+
+  md5sum --check no longer incorrectly enables BSD reversed format mode when
+  ignoring some non checksum lines.  This also affects sha*sum and b2sum.
+  [bug introduced in coreutils-8.14]
+
+  tail -F 'dir/file' is now monitored even when 'dir' is replaced.
+  [bug introduced with inotify support added in coreutils-7.5]
+
+  uptime no longer outputs the AM/PM component of the current time,
+  as that's inconsistent with the 24 hour time format used.
+  [bug introduced in coreutils-7.0]
+
+** New features
+
+  expand and unexpand now support specifying an offset for tab stops
+  by prefixing the last specified number like --tabs=1,+8 which is
+  useful for visualizing diff output for example.
+
+  split supports a new --hex-suffixes[=from] option to create files with
+  lower case hexadecimal suffixes, similar to the --numeric-suffixes option.
+
 ** Improvements
 
-  If the file B already exists, commands like 'ln -f A B' and
-  'cp -fl A B' no longer remove B before creating the new link.
-  That is, there is no longer a brief moment when B does not exist.
+  mv --verbose now distinguishes rename and copy operations.
+
+
+* Noteworthy changes in release 8.27 (2017-03-08) [stable]
 
 ** Bug fixes
+
+  cp --parents will now set an SELinux context for created directories,
+  as appropriate for the -a, --preseve=context, or -Z options.
+  [bug present since SELinux support added in coreutils-6.10]
 
   date again converts from a specified time zone.  Previously output was
   not converted to the local time zone, and remained in the specified one.
@@ -48,8 +90,27 @@ GNU coreutils NEWS                                    -*- outline -*-
   and the time zone abbreviation begins with "-", indicating that the
   time zone is indeterminate.
 
+  nproc now honors the OMP_THREAD_LIMIT environment variable to
+  set the maximum returned value.  OMP_NUM_THREADS continues to
+  set the minimum returned value, but is updated to support the
+  nested level syntax allowed in this variable.
+
+  stat and tail now know about the "rdt" file system, which is an interface
+  to Resource Director Technology.  stat -f --format=%T now reports the
+  file system type, and tail -f uses inotify.
+
   stty now validates arguments before interacting with the device,
   ensuring there are no side effects to specifying an invalid option.
+
+  If the file B already exists, commands like 'ln -f A B' and
+  'cp -fl A B' no longer remove B before creating the new link.
+  That is, there is no longer a brief moment when B does not exist.
+
+** New features
+
+  expand and unexpand now support specifying a tab size to use
+  after explicitly specified tab stops, by prefixing the last
+  specified number like --tabs=2,4,/8.
 
 
 * Noteworthy changes in release 8.26 (2016-11-30) [stable]
@@ -153,6 +214,10 @@ GNU coreutils NEWS                                    -*- outline -*-
   like '+2' must be treated as file names.
 
 ** Improvements
+
+  dd now warns about counts specified with a 0x "prefix", since dd will
+  interpret those as a zero multiplier rather than a hex constant.
+  The warning suggests to use 00x if a zero multiplier is really intended.
 
   df now filters the system mount list more efficiently, with 20000
   mount entries now being processed in about 1.1s compared to 1.7s.
