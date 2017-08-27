@@ -438,6 +438,7 @@ main (int argc, char **argv)
   int c;
   bool ok;
   bool make_backups = false;
+  char const *backup_suffix = NULL;
   char *version_control_string = NULL;
   char const *target_directory = NULL;
   bool no_target_directory = false;
@@ -515,7 +516,7 @@ main (int argc, char **argv)
           break;
         case 'S':
           make_backups = true;
-          simple_backup_suffix = optarg;
+          backup_suffix = optarg;
           break;
         case_GETOPT_HELP_CHAR;
         case_GETOPT_VERSION_CHAR (PROGRAM_NAME, AUTHORS);
@@ -565,6 +566,7 @@ main (int argc, char **argv)
   backup_type = (make_backups
                  ? xget_version (_("backup type"), version_control_string)
                  : no_backups);
+  set_simple_backup_suffix (backup_suffix);
 
   if (relative && !symbolic_link)
     {
@@ -575,8 +577,6 @@ main (int argc, char **argv)
 
   if (target_directory)
     {
-      int i;
-
       /* Create the data structure we'll use to record which hard links we
          create.  Used to ensure that ln detects an obscure corner case that
          might result in user data loss.  Create it only if needed.  */
@@ -600,7 +600,7 @@ main (int argc, char **argv)
         }
 
       ok = true;
-      for (i = 0; i < n_files; ++i)
+      for (int i = 0; i < n_files; ++i)
         {
           char *dest_base;
           char *dest = file_name_concat (target_directory,

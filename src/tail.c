@@ -175,6 +175,9 @@ static enum Follow_mode follow_mode = Follow_descriptor;
 /* If true, read from the ends of all specified files until killed.  */
 static bool forever;
 
+/* If true, monitor output so we exit if pipe reader terminates.  */
+static bool monitor_output;
+
 /* If true, count from start of file instead of end.  */
 static bool from_start;
 
@@ -325,6 +328,27 @@ named file in a way that accommodates renaming, removal and creation.\n\
       emit_ancillary_info (PROGRAM_NAME);
     }
   exit (status);
+}
+
+/* If the output has gone away, then terminate
+   as we would if we had written to this output.  */
+static void
+check_output_alive (void)
+{
+  if (! monitor_output)
+    return;
+
+  struct timeval delay;
+  delay.tv_sec = delay.tv_usec = 0;
+
+  fd_set rfd;
+  FD_ZERO (&rfd);
+  FD_SET (STDOUT_FILENO, &rfd);
+
+  /* readable event on STDOUT is equivalent to POLLERR,
+     and implies an error condition on output like broken pipe.  */
+  if (select (STDOUT_FILENO + 1, &rfd, NULL, NULL, &delay) == 1)
+    raise (SIGPIPE);
 }
 
 static bool
@@ -1075,15 +1099,13 @@ recheck (struct File_spec *f, bool blocking)
 static bool
 any_live_files (const struct File_spec *f, size_t n_files)
 {
-  size_t i;
-
   /* In inotify mode, ignore may be set for files
      which may later be replaced with new files.
      So always consider files live in -F mode.  */
   if (reopen_inaccessible_files && follow_mode == Follow_name)
     return true;
 
-  for (i = 0; i < n_files; i++)
+  for (size_t i = 0; i < n_files; i++)
     {
       if (0 <= f[i].fd)
         return true;
@@ -1244,6 +1266,8 @@ tail_forever (struct File_spec *f, size_t n_files, double sleep_interval)
       if ((!any_input || blocking) && fflush (stdout) != 0)
         die (EXIT_FAILURE, errno, _("write error"));
 
+      check_output_alive ();
+
       /* If nothing was read, sleep and/or check for dead writers.  */
       if (!any_input)
         {
@@ -1274,9 +1298,7 @@ tail_forever (struct File_spec *f, size_t n_files, double sleep_interval)
 static bool
 any_remote_file (const struct File_spec *f, size_t n_files)
 {
-  size_t i;
-
-  for (i = 0; i < n_files; i++)
+  for (size_t i = 0; i < n_files; i++)
     if (0 <= f[i].fd && f[i].remote)
       return true;
   return false;
@@ -1288,9 +1310,7 @@ any_remote_file (const struct File_spec *f, size_t n_files)
 static bool
 any_non_remote_file (const struct File_spec *f, size_t n_files)
 {
-  size_t i;
-
-  for (i = 0; i < n_files; i++)
+  for (size_t i = 0; i < n_files; i++)
     if (0 <= f[i].fd && ! f[i].remote)
       return true;
   return false;
@@ -1304,11 +1324,23 @@ any_non_remote_file (const struct File_spec *f, size_t n_files)
 static bool
 any_symlinks (const struct File_spec *f, size_t n_files)
 {
-  size_t i;
-
   struct stat st;
-  for (i = 0; i < n_files; i++)
+  for (size_t i = 0; i < n_files; i++)
     if (lstat (f[i].name, &st) == 0 && S_ISLNK (st.st_mode))
+      return true;
+  return false;
+}
+
+/* Return true if any of the N_FILES files in F is not
+   a regular file or fifo.  This is used to avoid adding inotify
+   watches on a device file for example, which inotify
+   will accept, but not give any events for.  */
+
+static bool
+any_non_regular_fifo (const struct File_spec *f, size_t n_files)
+{
+  for (size_t i = 0; i < n_files; i++)
+    if (0 <= f[i].fd && ! S_ISREG (f[i].mode) && ! S_ISFIFO (f[i].mode))
       return true;
   return false;
 }
@@ -1319,9 +1351,7 @@ any_symlinks (const struct File_spec *f, size_t n_files)
 static bool
 tailable_stdin (const struct File_spec *f, size_t n_files)
 {
-  size_t i;
-
-  for (i = 0; i < n_files; i++)
+  for (size_t i = 0; i < n_files; i++)
     if (!f[i].ignore && STREQ (f[i].name, "-"))
       return true;
   return false;
@@ -1577,32 +1607,48 @@ tail_forever_inotify (int wd, struct File_spec *f, size_t n_files,
 
       /* When watching a PID, ensure that a read from WD will not block
          indefinitely.  */
-      if (pid)
+      while (len <= evbuf_off)
         {
-          if (writer_is_dead)
-            exit (EXIT_SUCCESS);
-
-          writer_is_dead = (kill (pid, 0) != 0 && errno != EPERM);
-
           struct timeval delay; /* how long to wait for file changes.  */
-          if (writer_is_dead)
-            delay.tv_sec = delay.tv_usec = 0;
-          else
+
+          if (pid)
             {
-              delay.tv_sec = (time_t) sleep_interval;
-              delay.tv_usec = 1000000 * (sleep_interval - delay.tv_sec);
+              if (writer_is_dead)
+                exit (EXIT_SUCCESS);
+
+              writer_is_dead = (kill (pid, 0) != 0 && errno != EPERM);
+
+              if (writer_is_dead)
+                delay.tv_sec = delay.tv_usec = 0;
+              else
+                {
+                  delay.tv_sec = (time_t) sleep_interval;
+                  delay.tv_usec = 1000000 * (sleep_interval - delay.tv_sec);
+                }
             }
 
            fd_set rfd;
            FD_ZERO (&rfd);
            FD_SET (wd, &rfd);
+           if (monitor_output)
+             FD_SET (STDOUT_FILENO, &rfd);
 
-           int file_change = select (wd + 1, &rfd, NULL, NULL, &delay);
+           int file_change = select (MAX (wd, STDOUT_FILENO) + 1,
+                                     &rfd, NULL, NULL, pid ? &delay: NULL);
 
            if (file_change == 0)
              continue;
            else if (file_change == -1)
-             die (EXIT_FAILURE, errno, _("error monitoring inotify event"));
+             die (EXIT_FAILURE, errno,
+                  _("error waiting for inotify and output events"));
+           else if (FD_ISSET (STDOUT_FILENO, &rfd))
+             {
+               /* readable event on STDOUT is equivalent to POLLERR,
+                  and implies an error on output like broken pipe.  */
+               raise (SIGPIPE);
+             }
+           else
+             break;
         }
 
       if (len <= evbuf_off)
@@ -2064,8 +2110,8 @@ parse_obsolete_option (int argc, char * const *argv, uintmax_t *n_units)
 
   switch (*p)
     {
-    case 'b': default_count *= 512;	/* Fall through.  */
-    case 'c': t_count_lines = false;	/* Fall through.  */
+    case 'b': default_count *= 512; FALLTHROUGH;
+    case 'c': t_count_lines = false; FALLTHROUGH;
     case 'l': p++; break;
     }
 
@@ -2230,8 +2276,7 @@ ignore_fifo_and_pipe (struct File_spec *f, size_t n_files)
      ignore any "-" operand that corresponds to a pipe or FIFO.  */
   size_t n_viable = 0;
 
-  size_t i;
-  for (i = 0; i < n_files; i++)
+  for (size_t i = 0; i < n_files; i++)
     {
       bool is_a_fifo_or_pipe =
         (STREQ (f[i].name, "-")
@@ -2323,12 +2368,22 @@ main (int argc, char **argv)
     if (found_hyphen && follow_mode == Follow_name)
       die (EXIT_FAILURE, 0, _("cannot follow %s by name"), quoteaf ("-"));
 
-    /* When following forever, warn if any file is '-'.
+    /* When following forever, and not using simple blocking, warn if
+       any file is '-' as the stats() used to check for input are ineffective.
        This is only a warning, since tail's output (before a failing seek,
        and that from any non-stdin files) might still be useful.  */
-    if (forever && found_hyphen && isatty (STDIN_FILENO))
-      error (0, 0, _("warning: following standard input"
-                     " indefinitely is ineffective"));
+    if (forever && found_hyphen)
+      {
+        struct stat in_stat;
+        bool blocking_stdin;
+        blocking_stdin = (pid == 0 && follow_mode == Follow_descriptor
+                          && n_files == 1 && ! fstat (STDIN_FILENO, &in_stat)
+                          && ! S_ISREG (in_stat.st_mode));
+
+        if (! blocking_stdin && isatty (STDIN_FILENO))
+          error (0, 0, _("warning: following standard input"
+                         " indefinitely is ineffective"));
+      }
   }
 
   /* Don't read anything if we'll never output anything.  */
@@ -2350,6 +2405,15 @@ main (int argc, char **argv)
 
   if (forever && ignore_fifo_and_pipe (F, n_files))
     {
+      /* If stdout is a fifo or pipe, then monitor it
+         so that we exit if the reader goes away.
+         Note select() on a regular file is always readable.  */
+      struct stat out_stat;
+      if (fstat (STDOUT_FILENO, &out_stat) < 0)
+        die (EXIT_FAILURE, errno, _("standard output"));
+      monitor_output = (S_ISFIFO (out_stat.st_mode)
+                        || (HAVE_FIFO_PIPES != 1 && isapipe (STDOUT_FILENO)));
+
 #if HAVE_INOTIFY
       /* tailable_stdin() checks if the user specifies stdin via  "-",
          or implicitly by providing no arguments. If so, we won't use inotify.
@@ -2396,6 +2460,7 @@ main (int argc, char **argv)
                                || any_remote_file (F, n_files)
                                || ! any_non_remote_file (F, n_files)
                                || any_symlinks (F, n_files)
+                               || any_non_regular_fifo (F, n_files)
                                || (!ok && follow_mode == Follow_descriptor)))
         disable_inotify = true;
 

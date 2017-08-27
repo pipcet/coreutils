@@ -420,9 +420,8 @@ extent_copy (int src_fd, int dest_fd, char *buf, size_t buf_size,
           return false;
         }
 
-      unsigned int i;
       bool empty_extent = false;
-      for (i = 0; i < scan.ei_count || empty_extent; i++)
+      for (unsigned int i = 0; i < scan.ei_count || empty_extent; i++)
         {
           off_t ext_start;
           off_t ext_len;
@@ -1807,6 +1806,29 @@ should_dereference (const struct cp_options *x, bool command_line_arg)
              && command_line_arg);
 }
 
+/* Return true if the source file with basename SRCBASE and status SRC_ST
+   is likely to be the simple backup file for DST_NAME.  */
+static bool
+source_is_dst_backup (char const *srcbase, struct stat const *src_st,
+                      char const *dst_name)
+{
+  size_t srcbaselen = strlen (srcbase);
+  char const *dstbase = last_component (dst_name);
+  size_t dstbaselen = strlen (dstbase);
+  size_t suffixlen = strlen (simple_backup_suffix);
+  if (! (srcbaselen == dstbaselen + suffixlen
+         && memcmp (srcbase, dstbase, dstbaselen) == 0
+         && STREQ (srcbase + dstbaselen, simple_backup_suffix)))
+    return false;
+  size_t dstlen = strlen (dst_name);
+  char *dst_back = xmalloc (dstlen + suffixlen + 1);
+  strcpy (mempcpy (dst_back, dst_name, dstlen), simple_backup_suffix);
+  struct stat dst_back_sb;
+  int dst_back_status = stat (dst_back, &dst_back_sb);
+  free (dst_back);
+  return dst_back_status == 0 && SAME_INODE (*src_st, dst_back_sb);
+}
+
 /* Copy the file SRC_NAME to the file DST_NAME.  The files may be of
    any type.  NEW_DST should be true if the file DST_NAME cannot
    exist because its parent directory was just created; NEW_DST should
@@ -1838,7 +1860,6 @@ copy_internal (char const *src_name, char const *dst_name,
   bool restore_dst_mode = false;
   char *earlier_file = NULL;
   char *dst_backup = NULL;
-  bool backup_succeeded = false;
   bool delayed_ok;
   bool copied_as_regular = false;
   bool dest_is_symlink = false;
@@ -2071,10 +2092,11 @@ copy_internal (char const *src_name, char const *dst_name,
                 }
             }
 
+          char const *srcbase;
           if (x->backup_type != no_backups
               /* Don't try to back up a destination if the last
                  component of src_name is "." or "..".  */
-              && ! dot_or_dotdot (last_component (src_name))
+              && ! dot_or_dotdot (srcbase = last_component (src_name))
               /* Create a backup of each destination directory in move mode,
                  but not in copy mode.  FIXME: it might make sense to add an
                  option to suppress backup creation also for move mode.
@@ -2082,55 +2104,39 @@ copy_internal (char const *src_name, char const *dst_name,
                  existing hierarchy.  */
               && (x->move_mode || ! S_ISDIR (dst_sb.st_mode)))
             {
-              char *tmp_backup = find_backup_file_name (dst_name,
-                                                        x->backup_type);
-
-              /* Detect (and fail) when creating the backup file would
-                 destroy the source file.  Before, running the commands
+              /* Fail if creating the backup file would likely destroy
+                 the source file.  Otherwise, the commands:
                  cd /tmp; rm -f a a~; : > a; echo A > a~; cp --b=simple a~ a
                  would leave two zero-length files: a and a~.  */
-              /* FIXME: but simply change e.g., the final a~ to './a~'
-                 and the source will still be destroyed.  */
-              if (STREQ (tmp_backup, src_name))
+              if (x->backup_type != numbered_backups
+                  && source_is_dst_backup (srcbase, &src_sb, dst_name))
                 {
                   const char *fmt;
                   fmt = (x->move_mode
-                 ? _("backing up %s would destroy source;  %s not moved")
-                 : _("backing up %s would destroy source;  %s not copied"));
+                 ? _("backing up %s might destroy source;  %s not moved")
+                 : _("backing up %s might destroy source;  %s not copied"));
                   error (0, 0, fmt,
                          quoteaf_n (0, dst_name),
                          quoteaf_n (1, src_name));
-                  free (tmp_backup);
                   return false;
                 }
+
+              char *tmp_backup = backup_file_rename (dst_name, x->backup_type);
 
               /* FIXME: use fts:
                  Using alloca for a file name that may be arbitrarily
                  long is not recommended.  In fact, even forming such a name
                  should be discouraged.  Eventually, this code will be rewritten
                  to use fts, so using alloca here will be less of a problem.  */
-              ASSIGN_STRDUPA (dst_backup, tmp_backup);
-              free (tmp_backup);
-              /* In move mode, when src_name and dst_name are on the
-                 same partition (FIXME, and when they are non-directories),
-                 make the operation atomic: link dest
-                 to backup, then rename src to dest.  */
-              if (rename (dst_name, dst_backup) != 0)
+              if (tmp_backup)
                 {
-                  if (errno != ENOENT)
-                    {
-                      error (0, errno, _("cannot backup %s"),
-                             quoteaf (dst_name));
-                      return false;
-                    }
-                  else
-                    {
-                      dst_backup = NULL;
-                    }
+                  ASSIGN_STRDUPA (dst_backup, tmp_backup);
+                  free (tmp_backup);
                 }
-              else
+              else if (errno != ENOENT)
                 {
-                  backup_succeeded = true;
+                  error (0, errno, _("cannot backup %s"), quoteaf (dst_name));
+                  return false;
                 }
               new_dst = true;
             }
@@ -2195,7 +2201,7 @@ copy_internal (char const *src_name, char const *dst_name,
      sure we'll create a directory.  Also don't announce yet when moving
      so we can distinguish renames versus copies.  */
   if (x->verbose && !x->move_mode && !S_ISDIR (src_mode))
-    emit_verbose (src_name, dst_name, backup_succeeded ? dst_backup : NULL);
+    emit_verbose (src_name, dst_name, dst_backup);
 
   /* Associate the destination file name with the source device and inode
      so that if we encounter a matching dev/ino pair in the source tree
@@ -2318,8 +2324,7 @@ copy_internal (char const *src_name, char const *dst_name,
           if (x->verbose)
             {
               printf (_("renamed "));
-              emit_verbose (src_name, dst_name,
-                            backup_succeeded ? dst_backup : NULL);
+              emit_verbose (src_name, dst_name, dst_backup);
             }
 
           if (x->set_security_context)
@@ -2424,8 +2429,7 @@ copy_internal (char const *src_name, char const *dst_name,
       if (x->verbose && !S_ISDIR (src_mode))
         {
           printf (_("copied "));
-          emit_verbose (src_name, dst_name,
-                        backup_succeeded ? dst_backup : NULL);
+          emit_verbose (src_name, dst_name, dst_backup);
         }
       new_dst = true;
     }
@@ -2714,7 +2718,8 @@ copy_internal (char const *src_name, char const *dst_name,
             {
               error (0, errno, _("failed to preserve ownership for %s"),
                      dst_name);
-              goto un_backup;
+              if (x->require_preserve)
+                goto un_backup;
             }
           else
             {

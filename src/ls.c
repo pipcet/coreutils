@@ -1041,12 +1041,9 @@ dired_dump_obstack (const char *prefix, struct obstack *os)
   n_pos = obstack_object_size (os) / sizeof (dired_pos);
   if (n_pos > 0)
     {
-      size_t i;
-      size_t *pos;
-
-      pos = (size_t *) obstack_finish (os);
+      size_t *pos = (size_t *) obstack_finish (os);
       fputs (prefix, stdout);
-      for (i = 0; i < n_pos; i++)
+      for (size_t i = 0; i < n_pos; i++)
         printf (" %lu", (unsigned long int) pos[i]);
       putchar ('\n');
     }
@@ -2198,8 +2195,7 @@ decode_switches (int argc, char **argv)
             case locale_time_style:
               if (hard_locale (LC_TIME))
                 {
-                  int i;
-                  for (i = 0; i < 2; i++)
+                  for (int i = 0; i < 2; i++)
                     long_time_format[i] =
                       dcgettext (NULL, long_time_format[i], LC_TIME);
                 }
@@ -2269,7 +2265,7 @@ get_funky_string (char **dest, const char **src, bool equals_end,
                   state = ST_END; /* End */
                   break;
                 }
-              /* else fall through */
+              FALLTHROUGH;
             default:
               *(q++) = *(p++);
               ++count;
@@ -2926,9 +2922,7 @@ free_ent (struct fileinfo *f)
 static void
 clear_files (void)
 {
-  size_t i;
-
-  for (i = 0; i < cwd_n_used; i++)
+  for (size_t i = 0; i < cwd_n_used; i++)
     {
       struct fileinfo *f = sorted_file[i];
       free_ent (f);
@@ -3157,7 +3151,7 @@ gobble_file (char const *name, enum filetype type, ino_t inode,
                  directory, and --dereference-command-line-symlink-to-dir is
                  in effect.  Fall through so that we call lstat instead.  */
             }
-          /* fall through */
+          FALLTHROUGH;
 
         default: /* DEREF_NEVER */
           err = lstat (absolute_name, &f->stat);
@@ -3239,6 +3233,11 @@ gobble_file (char const *name, enum filetype type, ino_t inode,
 
           get_link_name (absolute_name, f, command_line_arg);
           char *linkname = make_link_name (absolute_name, f->linkname);
+
+          /* Use the slower quoting path for this entry, though
+             don't update CWD_SOME_QUOTED since alignment not affected.  */
+          if (linkname && f->quoted == 0 && needs_quoting (f->linkname))
+            f->quoted = -1;
 
           /* Avoid following symbolic links when possible, ie, when
              they won't be traced and when no indicator is needed.  */
@@ -3708,8 +3707,7 @@ verify (ARRAY_CARDINALITY (sort_functions)
 static void
 initialize_ordering_vector (void)
 {
-  size_t i;
-  for (i = 0; i < cwd_n_used; i++)
+  for (size_t i = 0; i < cwd_n_used; i++)
     sorted_file[i] = &cwd_file[i];
 }
 
@@ -4965,9 +4963,8 @@ calculate_columns (bool by_columns)
     {
       struct fileinfo const *f = sorted_file[filesno];
       size_t name_length = length_of_file_name_and_frills (f);
-      size_t i;
 
-      for (i = 0; i < max_cols; ++i)
+      for (size_t i = 0; i < max_cols; ++i)
         {
           if (column_info[i].valid_len)
             {

@@ -1,7 +1,7 @@
 #!/bin/sh
-# ensure groups handles -- sanely
+# Ensure symlinks are quoted appropriately
 
-# Copyright (C) 2007-2017 Free Software Foundation, Inc.
+# Copyright (C) 2017 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,17 +17,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
-print_ver_ groups
+print_ver_ ls
 
-# An invalid user name
-user=:invalid
+ln -s 'needs quoting' symlink || framework_failure_
 
-printf '%s\n' "groups: ':invalid': no such user" > exp || framework_failure_
+ls -l --quoting-style='shell-escape' symlink >out || fail=1
 
-# Coreutils 6.9 and earlier failed to display information on first argument
-# if later argument was --.
-returns_ 1 groups $user -- > out 2>&1 || fail=1
-
-compare exp out || fail=1
+# Coreutils v8.26 and 8.27 failed to quote the target name
+grep -q "symlink -> 'needs quoting'\$" out ||
+  { cat out; fail=1; }
 
 Exit $fail

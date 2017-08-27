@@ -177,6 +177,7 @@ all_tests =					\
   tests/tail-2/inotify-rotate.sh		\
   tests/tail-2/inotify-rotate-resources.sh	\
   tests/tail-2/inotify-dir-recreate.sh		\
+  tests/tail-2/inotify-only-regular.sh		\
   tests/chmod/no-x.sh				\
   tests/chgrp/basic.sh				\
   tests/rm/dangling-symlink.sh			\
@@ -289,11 +290,13 @@ all_tests =					\
   tests/misc/env-null.sh			\
   tests/misc/expand.pl				\
   tests/misc/expr.pl				\
+  tests/misc/expr-multibyte.pl			\
   tests/misc/factor.pl				\
   tests/misc/factor-parallel.sh			\
   tests/misc/false-status.sh			\
   tests/misc/fold.pl				\
   tests/misc/groups-dash.sh			\
+  tests/misc/groups-process-all.sh		\
   tests/misc/groups-version.sh			\
   tests/misc/head-c.sh				\
   tests/misc/head-pos.sh			\
@@ -600,6 +603,7 @@ all_tests =					\
   tests/ls/stat-free-color.sh			\
   tests/ls/stat-free-symlinks.sh		\
   tests/ls/stat-vs-dirent.sh			\
+  tests/ls/symlink-quote.sh			\
   tests/ls/symlink-slash.sh			\
   tests/ls/time-style-diag.sh			\
   tests/ls/x-option.sh				\

@@ -640,7 +640,6 @@ do_copy (int n_files, char **file, const char *target_directory,
       /* cp file1...filen edir
          Copy the files 'file1' through 'filen'
          to the existing directory 'edir'. */
-      int i;
 
       /* Initialize these hash tables only if we'll need them.
          The problems they're used to detect can arise only if
@@ -651,7 +650,7 @@ do_copy (int n_files, char **file, const char *target_directory,
           src_info_init (x);
         }
 
-      for (i = 0; i < n_files; i++)
+      for (int i = 0; i < n_files; i++)
         {
           char *dst_name;
           bool parent_exists = true;  /* True if dir_name (dst_name) exists. */
@@ -931,6 +930,7 @@ main (int argc, char **argv)
   int c;
   bool ok;
   bool make_backups = false;
+  char const *backup_suffix = NULL;
   char *version_control_string = NULL;
   struct cp_options x;
   bool copy_contents = false;
@@ -1045,7 +1045,7 @@ main (int argc, char **argv)
               x.require_preserve = true;
               break;
             }
-          /* fall through */
+          FALLTHROUGH;
 
         case 'p':
           x.preserve_ownership = true;
@@ -1127,7 +1127,7 @@ main (int argc, char **argv)
 
         case 'S':
           make_backups = true;
-          simple_backup_suffix = optarg;
+          backup_suffix = optarg;
           break;
 
         case_GETOPT_HELP_CHAR;
@@ -1162,6 +1162,7 @@ main (int argc, char **argv)
                    ? xget_version (_("backup type"),
                                    version_control_string)
                    : no_backups);
+  set_simple_backup_suffix (backup_suffix);
 
   if (x.dereference == DEREF_UNDEFINED)
     {
