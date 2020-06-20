@@ -1,5 +1,5 @@
 /* mv -- move or rename files
-   Copyright (C) 1986-2017 Free Software Foundation, Inc.
+   Copyright (C) 1986-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Written by Mike Parker, David MacKenzie, and Jim Meyering */
 
@@ -31,6 +31,7 @@
 #include "error.h"
 #include "filenamecat.h"
 #include "remove.h"
+#include "renameatu.h"
 #include "root-dev-ino.h"
 #include "priv-set.h"
 
@@ -98,6 +99,8 @@ rm_option_init (struct rm_options *x)
       die (EXIT_FAILURE, errno, _("failed to get attributes of %s"),
            quoteaf ("/"));
   }
+
+  x->preserve_all_root = false;
 }
 
 static void
@@ -452,12 +455,22 @@ main (int argc, char **argv)
   else if (!target_directory)
     {
       assert (2 <= n_files);
-      if (target_directory_operand (file[n_files - 1]))
-        target_directory = file[--n_files];
+      if (n_files == 2)
+        x.rename_errno = (renameatu (AT_FDCWD, file[0], AT_FDCWD, file[1],
+                                     RENAME_NOREPLACE)
+                          ? errno : 0);
+      if (x.rename_errno != 0 && target_directory_operand (file[n_files - 1]))
+        {
+          x.rename_errno = -1;
+          target_directory = file[--n_files];
+        }
       else if (2 < n_files)
         die (EXIT_FAILURE, 0, _("target %s is not a directory"),
              quoteaf (file[n_files - 1]));
     }
+
+  if (x.interactive == I_ALWAYS_NO)
+    x.update = false;
 
   if (make_backups && x.interactive == I_ALWAYS_NO)
     {
@@ -484,10 +497,16 @@ main (int argc, char **argv)
 
       ok = true;
       for (int i = 0; i < n_files; ++i)
-        ok &= movefile (file[i], target_directory, true, &x);
+        {
+          x.last_file = i + 1 == n_files;
+          ok &= movefile (file[i], target_directory, true, &x);
+        }
     }
   else
-    ok = movefile (file[0], file[1], false, &x);
+    {
+      x.last_file = true;
+      ok = movefile (file[0], file[1], false, &x);
+    }
 
   return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }

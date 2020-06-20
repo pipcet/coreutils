@@ -1,5 +1,5 @@
 /* mknod -- make special files
-   Copyright (C) 1990-2017 Free Software Foundation, Inc.
+   Copyright (C) 1990-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Written by David MacKenzie <djm@ai.mit.edu>  */
 
@@ -230,12 +230,12 @@ main (int argc, char **argv)
         uintmax_t i_major, i_minor;
         dev_t device;
 
-        if (xstrtoumax (s_major, NULL, 0, &i_major, NULL) != LONGINT_OK
+        if (xstrtoumax (s_major, NULL, 0, &i_major, "") != LONGINT_OK
             || i_major != (major_t) i_major)
           die (EXIT_FAILURE, 0,
                _("invalid major device number %s"), quote (s_major));
 
-        if (xstrtoumax (s_minor, NULL, 0, &i_minor, NULL) != LONGINT_OK
+        if (xstrtoumax (s_minor, NULL, 0, &i_minor, "") != LONGINT_OK
             || i_minor != (minor_t) i_minor)
           die (EXIT_FAILURE, 0,
                _("invalid minor device number %s"), quote (s_minor));

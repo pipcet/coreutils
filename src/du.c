@@ -1,5 +1,5 @@
 /* du -- summarize disk usage
-   Copyright (C) 1988-2017 Free Software Foundation, Inc.
+   Copyright (C) 1988-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Differences from the Unix du:
    * Doesn't simply ignore the names of regular files given as arguments
@@ -43,6 +43,7 @@
 #include "stdio--.h"
 #include "xfts.h"
 #include "xstrtol.h"
+#include "xstrtol-error.h"
 
 extern bool fts_debug;
 
@@ -807,12 +808,12 @@ main (int argc, char **argv)
 
         case 'd':		/* --max-depth=N */
           {
-            unsigned long int tmp_ulong;
-            if (xstrtoul (optarg, NULL, 0, &tmp_ulong, NULL) == LONGINT_OK
-                && tmp_ulong <= SIZE_MAX)
+            uintmax_t tmp;
+            if (xstrtoumax (optarg, NULL, 0, &tmp, "") == LONGINT_OK
+                && tmp <= SIZE_MAX)
               {
                 max_depth_specified = true;
-                max_depth = tmp_ulong;
+                max_depth = tmp;
               }
             else
               {

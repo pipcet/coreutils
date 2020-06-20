@@ -1,7 +1,7 @@
 #!/bin/sh
 # Ensure that touch honors trailing slash.
 
-# Copyright (C) 2009-2017 Free Software Foundation, Inc.
+# Copyright (C) 2009-2020 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
 print_ver_ touch
@@ -33,7 +33,9 @@ returns_ 1 touch no-file/ || fail=1
 returns_ 1 touch file/ || fail=1
 returns_ 1 touch dangling/ || fail=1
 returns_ 1 touch loop/ || fail=1
-returns_ 1 touch link1/ || fail=1
+if returns_ 2 ls link1/; then  # darwin allows trailing slash to files
+  returns_ 1 touch link1/ || fail=1
+fi
 touch dir/ || fail=1
 
 # -c silences ENOENT, but not ENOTDIR or ELOOP
@@ -41,7 +43,9 @@ touch -c no-file/ || fail=1
 returns_ 1 touch -c file/ || fail=1
 touch -c dangling/ || fail=1
 returns_ 1 touch -c loop/ || fail=1
-returns_ 1 touch -c link1/ || fail=1
+if returns_ 2 ls link1/; then
+  returns_ 1 touch -c link1/ || fail=1
+fi
 touch -c dir/ || fail=1
 returns_ 1 test -f no-file || fail=1
 returns_ 1 test -f nowhere || fail=1

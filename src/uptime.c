@@ -1,5 +1,5 @@
 /* GNU's uptime.
-   Copyright (C) 1992-2017 Free Software Foundation, Inc.
+   Copyright (C) 1992-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,18 +12,17 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Created by hacking who.c by Kaveh Ghazi ghazi@caip.rutgers.edu.  */
 
 #include <config.h>
-#include <getopt.h>
 #include <stdio.h>
 
 #include <sys/types.h>
 #include "system.h"
 
-#if HAVE_SYSCTL && HAVE_SYS_SYSCTL_H
+#if HAVE_SYSCTL && HAVE_SYS_SYSCTL_H && ! defined __GLIBC__
 # include <sys/sysctl.h>
 #endif
 
@@ -81,7 +80,8 @@ print_uptime (size_t n, const STRUCT_UTMP *this)
     }
 #endif /* HAVE_PROC_UPTIME */
 
-#if HAVE_SYSCTL && defined CTL_KERN && defined KERN_BOOTTIME
+#if HAVE_SYSCTL && ! defined __GLIBC__ \
+    && defined CTL_KERN && defined KERN_BOOTTIME
   {
     /* FreeBSD specific: fetch sysctl "kern.boottime".  */
     static int request[2] = { CTL_KERN, KERN_BOOTTIME };
@@ -234,10 +234,9 @@ main (int argc, char **argv)
 
   atexit (close_stdout);
 
-  parse_long_options (argc, argv, PROGRAM_NAME, PACKAGE_NAME, Version,
-                      usage, AUTHORS, (char const *) NULL);
-  if (getopt_long (argc, argv, "", NULL, NULL) != -1)
-    usage (EXIT_FAILURE);
+  parse_gnu_standard_options_only (argc, argv, PROGRAM_NAME, PACKAGE_NAME,
+                                   Version, true, usage, AUTHORS,
+                                   (char const *) NULL);
 
   switch (argc - optind)
     {

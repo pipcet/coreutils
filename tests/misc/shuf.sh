@@ -1,7 +1,7 @@
 #!/bin/sh
 # Ensure that shuf randomizes its input.
 
-# Copyright (C) 2006-2017 Free Software Foundation, Inc.
+# Copyright (C) 2006-2020 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
 print_ver_ shuf
@@ -38,6 +38,10 @@ shuf -i 1-100 > out || fail=1
 compare in out > /dev/null && { fail=1; echo "not random?" 1>&2; }
 sort -n out > out1
 compare in out1 || { fail=1; echo "not a permutation" 1>&2; }
+
+# Exercize shuf's -r -n 0 options, with no standard input.
+shuf -r -n 0 in <&- >out || fail=1
+compare /dev/null out || fail=1
 
 # Exercise shuf's -e option.
 t=$(shuf -e a b c d e | sort | fmt)

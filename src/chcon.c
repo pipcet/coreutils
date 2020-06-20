@@ -1,5 +1,5 @@
 /* chcon -- change security context of files
-   Copyright (C) 2005-2017 Free Software Foundation, Inc.
+   Copyright (C) 2005-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,12 +12,13 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <getopt.h>
+#include <selinux/selinux.h>
 
 #include "system.h"
 #include "dev-ino.h"
@@ -557,7 +558,8 @@ main (int argc, char **argv)
   else
     {
       specified_context = argv[optind++];
-      if (security_check_context (se_const (specified_context)) < 0)
+      if (0 < is_selinux_enabled ()
+          && security_check_context (se_const (specified_context)) < 0)
         die (EXIT_FAILURE, errno, _("invalid context: %s"),
              quote (specified_context));
     }

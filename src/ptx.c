@@ -1,5 +1,5 @@
 /* Permuted index for GNU, with keywords in their context.
-   Copyright (C) 1990-2017 Free Software Foundation, Inc.
+   Copyright (C) 1990-2020 Free Software Foundation, Inc.
    François Pinard <pinard@iro.umontreal.ca>, 1988.
 
    This program is free software: you can redistribute it and/or modify
@@ -13,7 +13,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
    François Pinard <pinard@iro.umontreal.ca> */
 
@@ -520,9 +520,9 @@ swallow_file_in_memory (const char *file_name, BLOCK *block)
      its name.  */
   bool using_stdin = !file_name || !*file_name || STREQ (file_name, "-");
   if (using_stdin)
-    block->start = fread_file (stdin, &used_length);
+    block->start = fread_file (stdin, 0, &used_length);
   else
-    block->start = read_file (file_name, &used_length);
+    block->start = read_file (file_name, 0, &used_length);
 
   if (!block->start)
     die (EXIT_FAILURE, errno, "%s", quotef (using_stdin ? "-" : file_name));
@@ -817,6 +817,11 @@ find_occurs_in_text (int file_index)
 
           case -1:
             break;
+
+          case 0:
+            die (EXIT_FAILURE, 0,
+                 _("error: regular expression has a match of length zero: %s"),
+                 quote (context_regex.string));
 
           default:
             next_context_start = cursor + context_regs.end[0];
@@ -1189,7 +1194,7 @@ print_field (BLOCK field)
 static void
 fix_output_parameters (void)
 {
-  int file_index;		/* index in text input file arrays */
+  size_t file_index;		/* index in text input file arrays */
   intmax_t line_ordinal;	/* line ordinal value for reference */
   ptrdiff_t reference_width;	/* width for the whole reference */
   int character;		/* character ordinal */
@@ -1935,7 +1940,7 @@ main (int argc, char **argv)
         case 'g':
           {
             intmax_t tmp;
-            if (! (xstrtoimax (optarg, NULL, 0, &tmp, NULL) == LONGINT_OK
+            if (! (xstrtoimax (optarg, NULL, 0, &tmp, "") == LONGINT_OK
                    && 0 < tmp && tmp <= PTRDIFF_MAX))
               die (EXIT_FAILURE, 0, _("invalid gap width: %s"),
                    quote (optarg));
@@ -1962,7 +1967,7 @@ main (int argc, char **argv)
         case 'w':
           {
             intmax_t tmp;
-            if (! (xstrtoimax (optarg, NULL, 0, &tmp, NULL) == LONGINT_OK
+            if (! (xstrtoimax (optarg, NULL, 0, &tmp, "") == LONGINT_OK
                    && 0 < tmp && tmp <= PTRDIFF_MAX))
               die (EXIT_FAILURE, 0, _("invalid line width: %s"),
                    quote (optarg));

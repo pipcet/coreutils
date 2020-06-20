@@ -1,7 +1,7 @@
 #!/bin/sh
 # Test the suffix auto width functionality
 
-# Copyright (C) 2012-2017 Free Software Foundation, Inc.
+# Copyright (C) 2012-2020 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
 print_ver_ split
@@ -49,5 +49,11 @@ rm -f x*
 # That's the multi run use case which is invalid to adjust suffix len
 # as that would result in an incorrect order for the total output file set
 returns_ 1 split --numeric-suffixes=100 --number=r/100 file.in || fail=1
+
+# coreutils v8.24 - v8.31 inclusive would incorrectly auto calculate
+# a suffix length that was too small, when the number of files was
+# evenly divisible by the suffix base (10,16,26).
+truncate -s0 file.in || framework_failure_
+split --numeric-suffixes --number=110 file.in || fail=1
 
 Exit $fail

@@ -1,5 +1,5 @@
 /* core functions for copying files and directories
-   Copyright (C) 1989-2017 Free Software Foundation, Inc.
+   Copyright (C) 1989-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Extracted from cp.c and librarified by Jim Meyering.  */
 
@@ -46,10 +46,10 @@ enum Sparse_type
 /* Control creation of COW files.  */
 enum Reflink_type
 {
-  /* Default to a standard copy.  */
+  /* Do a standard copy.  */
   REFLINK_NEVER,
 
-  /* Try a COW copy and fall back to a standard copy.  */
+  /* Try a COW copy and fall back to a standard copy; this is the default.  */
   REFLINK_AUTO,
 
   /* Require a COW copy and fail if not available.  */
@@ -249,6 +249,15 @@ struct cp_options
      such a symlink) and returns false.  */
   bool open_dangling_dest_symlink;
 
+  /* If true, this is the last filed to be copied.  mv uses this to
+     avoid some unnecessary work.  */
+  bool last_file;
+
+  /* Zero if the source has already been renamed to the destination; a
+     positive errno number if this failed with the given errno; -1 if
+     no attempt has been made to rename.  Always -1, except for mv.  */
+  int rename_errno;
+
   /* Control creation of COW files.  */
   enum Reflink_type reflink_mode;
 
@@ -266,11 +275,6 @@ struct cp_options
   /* FIXME */
   Hash_table *src_info;
 };
-
-# define XSTAT(X, Src_name, Src_sb) \
-  ((X)->dereference == DEREF_NEVER \
-   ? lstat (Src_name, Src_sb) \
-   : stat (Src_name, Src_sb))
 
 /* Arrange to make rename calls go through the wrapper function
    on systems with a rename function that fails for a source file name

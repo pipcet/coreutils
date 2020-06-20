@@ -1,5 +1,5 @@
 /* chroot -- run command or shell with special root directory
-   Copyright (C) 1995-2017 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Written by Roland McGrath.  */
 
@@ -106,9 +106,10 @@ parse_additional_groups (char const *groups, GETGROUPS_T **pgids,
   for (tmp = strtok (buffer, ","); tmp; tmp = strtok (NULL, ","))
     {
       struct group *g;
-      unsigned long int value;
+      uintmax_t value;
 
-      if (xstrtoul (tmp, NULL, 10, &value, "") == LONGINT_OK && value <= MAXGID)
+      if (xstrtoumax (tmp, NULL, 10, &value, "") == LONGINT_OK
+          && value <= MAXGID)
         {
           while (isspace (to_uchar (*tmp)))
             tmp++;

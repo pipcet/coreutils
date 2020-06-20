@@ -1,5 +1,5 @@
 /* install - copy files and set attributes
-   Copyright (C) 1989-2017 Free Software Foundation, Inc.
+   Copyright (C) 1989-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Written by David MacKenzie <djm@gnu.ai.mit.edu> */
 
@@ -264,7 +264,7 @@ cp_option_init (struct cp_options *x)
 {
   cp_options_default (x);
   x->copy_as_regular = true;
-  x->reflink_mode = REFLINK_NEVER;
+  x->reflink_mode = REFLINK_AUTO;
   x->dereference = DEREF_ALWAYS;
   x->unlink_dest_before_opening = true;
   x->unlink_dest_after_failed_open = false;
@@ -583,8 +583,8 @@ get_ids (void)
       pw = getpwnam (owner_name);
       if (pw == NULL)
         {
-          unsigned long int tmp;
-          if (xstrtoul (owner_name, NULL, 0, &tmp, NULL) != LONGINT_OK
+          uintmax_t tmp;
+          if (xstrtoumax (owner_name, NULL, 0, &tmp, "") != LONGINT_OK
               || UID_T_MAX < tmp)
             die (EXIT_FAILURE, 0, _("invalid user %s"),
                  quote (owner_name));
@@ -602,8 +602,8 @@ get_ids (void)
       gr = getgrnam (group_name);
       if (gr == NULL)
         {
-          unsigned long int tmp;
-          if (xstrtoul (group_name, NULL, 0, &tmp, NULL) != LONGINT_OK
+          uintmax_t tmp;
+          if (xstrtoumax (group_name, NULL, 0, &tmp, "") != LONGINT_OK
               || GID_T_MAX < tmp)
             die (EXIT_FAILURE, 0, _("invalid group %s"),
                  quote (group_name));

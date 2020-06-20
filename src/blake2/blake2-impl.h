@@ -5,15 +5,22 @@
    terms of the CC0, the OpenSSL Licence, or the Apache Public License 2.0, at
    your option.  The terms of these licenses can be found at:
 
-   - CC0 1.0 Universal : http://creativecommons.org/publicdomain/zero/1.0
+   - CC0 1.0 Universal : https://creativecommons.org/publicdomain/zero/1.0
    - OpenSSL license   : https://www.openssl.org/source/license.html
-   - Apache 2.0        : http://www.apache.org/licenses/LICENSE-2.0
+   - Apache 2.0        : https://www.apache.org/licenses/LICENSE-2.0
 
    More information about the BLAKE2 hash function can be found at
    https://blake2.net.
 */
 #ifndef BLAKE2_IMPL_H
 #define BLAKE2_IMPL_H
+
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
+#ifndef WORDS_BIGENDIAN
+# define NATIVE_LITTLE_ENDIAN 1
+#endif
 
 #include <stdint.h>
 #include <string.h>
@@ -72,8 +79,8 @@ static BLAKE2_INLINE uint16_t load16( const void *src )
   return w;
 #else
   const uint8_t *p = ( const uint8_t * )src;
-  return (( uint16_t )( p[0] ) <<  0) |
-         (( uint16_t )( p[1] ) <<  8) ;
+  return ( uint16_t )((( uint32_t )( p[0] ) <<  0) |
+                      (( uint32_t )( p[1] ) <<  8));
 #endif
 }
 

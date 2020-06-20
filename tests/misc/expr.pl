@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # Basic tests for "expr".
 
-# Copyright (C) 2001-2017 Free Software Foundation, Inc.
+# Copyright (C) 2001-2020 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use strict;
 
@@ -164,8 +164,6 @@ my @Tests =
      ['bre61', '"acd" : "a\\(b\\)?c\\1d"', {OUT => ''}, {EXIT => 1}],
      ['bre62', '-- "-5" : "-\\{0,1\\}[0-9]*\$"', {OUT => '2'}],
 
-     ['fail-b', '9 9', {ERR => "$prog: syntax error\n"},
-      {EXIT => 2}],
      ['fail-c', {ERR => "$prog: missing operand\n"
                  . "Try '$prog --help' for more information.\n"},
       {EXIT => 2}],
@@ -176,6 +174,23 @@ my @Tests =
      ['bignum-sub2', "$big_sum - $big", {OUT => $big_p1}],
      ['bignum-mul', "$big_p1 '*' $big", {OUT => $big_prod}],
      ['bignum-div', "$big_prod / $big", {OUT => $big_p1}],
+
+
+     # Test syntax error messages
+     ['se0', '9 9',
+      {ERR => "$prog: syntax error: unexpected argument '9'\n"}, {EXIT => 2}],
+     ['se1', "2 a", {EXIT=>2},
+      {ERR=>"$prog: syntax error: unexpected argument 'a'\n"}],
+     ['se2', "2 '+'", {EXIT=>2},
+      {ERR=>"$prog: syntax error: missing argument after '+'\n"}],
+     ['se3', "2 :", {EXIT=>2},
+      {ERR=>"$prog: syntax error: missing argument after ':'\n"}],
+     ['se4', "length", {EXIT=>2},
+      {ERR=>"$prog: syntax error: missing argument after 'length'\n"}],
+     ['se5', "'(' 2 ", {EXIT=>2},
+      {ERR=>"$prog: syntax error: expecting ')' after '2'\n"}],
+     ['se6', "'(' 2 a", {EXIT=>2},
+      {ERR=>"$prog: syntax error: expecting ')' instead of 'a'\n"}],
     );
 
 # If using big numbers fails, remove all /^bignum-/ tests
@@ -195,6 +210,8 @@ foreach $t (@Tests)
       }
   }
 
+# Try multibyte locale in most tests.
+#
 if ($mb_locale ne 'C')
   {
     # Duplicate each test vector, appending "-mb" to the test name and
@@ -203,6 +220,10 @@ if ($mb_locale ne 'C')
     my @new;
     foreach my $t (@Tests)
       {
+        # Don't add the quote varying tests to the multi-byte set
+        $t->[0] =~ /^se/
+        and next;
+
         my @new_t = @$t;
         my $test_name = shift @new_t;
 

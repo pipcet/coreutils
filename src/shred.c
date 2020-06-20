@@ -1,6 +1,6 @@
 /* shred.c - overwrite files and devices to make it harder to recover data
 
-   Copyright (C) 1999-2017 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    Copyright (C) 1997, 1998, 1999 Colin Plumb.
 
    This program is free software: you can redistribute it and/or modify
@@ -14,7 +14,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
    Written by Colin Plumb.  */
 
@@ -80,7 +80,7 @@
 #include <assert.h>
 #include <setjmp.h>
 #include <sys/types.h>
-#ifdef __linux__
+#if defined __linux__ && HAVE_SYS_MTIO_H
 # include <sys/mtio.h>
 #endif
 
@@ -93,7 +93,7 @@
 #include "human.h"
 #include "randint.h"
 #include "randread.h"
-#include "renameat2.h"
+#include "renameatu.h"
 #include "stat-size.h"
 
 /* Default number of times to overwrite.  */
@@ -186,7 +186,7 @@ If FILE is -, shred standard output.\n\
   -s, --size=N   shred this many bytes (suffixes like K, M, G accepted)\n\
 "), DEFAULT_PASSES);
       fputs (_("\
-  -u             truncate and remove file after overwriting\n\
+  -u             deallocate and remove file after overwriting\n\
       --remove[=HOW]  like -u but give control on HOW to delete;  See below\n\
   -v, --verbose  show progress\n\
   -x, --exact    do not round file sizes up to the next full block;\n\
@@ -208,44 +208,10 @@ The default mode is 'wipesync', but note it can be expensive.\n\
 \n\
 "), stdout);
       fputs (_("\
-CAUTION: Note that shred relies on a very important assumption:\n\
-that the file system overwrites data in place.  This is the traditional\n\
-way to do things, but many modern file system designs do not satisfy this\n\
-assumption.  The following are examples of file systems on which shred is\n\
-not effective, or is not guaranteed to be effective in all file system modes:\n\
-\n\
-"), stdout);
-      fputs (_("\
-* log-structured or journaled file systems, such as those supplied with\n\
-AIX and Solaris (and JFS, ReiserFS, XFS, Ext3, etc.)\n\
-\n\
-* file systems that write redundant data and carry on even if some writes\n\
-fail, such as RAID-based file systems\n\
-\n\
-* file systems that make snapshots, such as Network Appliance's NFS server\n\
-\n\
-"), stdout);
-      fputs (_("\
-* file systems that cache in temporary locations, such as NFS\n\
-version 3 clients\n\
-\n\
-* compressed file systems\n\
-\n\
-"), stdout);
-      fputs (_("\
-In the case of ext3 file systems, the above disclaimer applies\n\
-(and shred is thus of limited effectiveness) only in data=journal mode,\n\
-which journals file data in addition to just metadata.  In both the\n\
-data=ordered (default) and data=writeback modes, shred works as usual.\n\
-Ext3 journaling modes can be changed by adding the data=something option\n\
-to the mount options for a particular file system in the /etc/fstab file,\n\
-as documented in the mount man page (man mount).\n\
-\n\
-"), stdout);
-      fputs (_("\
-In addition, file system backups and remote mirrors may contain copies\n\
-of the file that cannot be removed, and that will allow a shredded file\n\
-to be recovered later.\n\
+CAUTION: shred assumes the file system and hardware overwrite data in place.\n\
+Although this is common, many platforms operate otherwise.  Also, backups\n\
+and mirrors may contain unremovable copies that will let a shredded file\n\
+be recovered later.  See the GNU coreutils manual for details.\n\
 "), stdout);
       emit_ancillary_info (PROGRAM_NAME);
     }
@@ -391,7 +357,7 @@ dorewind (int fd, struct stat const *st)
 {
   if (S_ISCHR (st->st_mode))
     {
-#ifdef __linux__
+#if defined __linux__ && HAVE_SYS_MTIO_H
       /* In the Linux kernel, lseek does not work on tape devices; it
          returns a randomish value instead.  Try the low-level tape
          rewind operation first.  */
@@ -975,11 +941,13 @@ do_wipefd (int fd, char const *qname, struct randint_source *s,
         }
     }
 
-  /* Now deallocate the data.  The effect of ftruncate on
-     non-regular files is unspecified, so don't worry about any
-     errors reported for them.  */
+  /* Now deallocate the data.  The effect of ftruncate is specified
+     on regular files and shared memory objects (also directories, but
+     they are not possible here); don't worry about errors reported
+     for other file types.  */
+
   if (flags->remove_file && ftruncate (fd, 0) != 0
-      && S_ISREG (st.st_mode))
+      && (S_ISREG (st.st_mode) || S_TYPEISSHM (&st)))
     {
       error (0, errno, _("%s: error truncating"), qname);
       ok = false;
@@ -1096,7 +1064,7 @@ wipename (char *oldname, char const *qoldname, struct Options const *flags)
         memset (base, nameset[0], len);
         base[len] = 0;
         bool rename_ok;
-        while (! (rename_ok = (renameat2 (AT_FDCWD, oldname, AT_FDCWD, newname,
+        while (! (rename_ok = (renameatu (AT_FDCWD, oldname, AT_FDCWD, newname,
                                           RENAME_NOREPLACE)
                                == 0))
                && errno == EEXIST && incname (base, len))
@@ -1117,7 +1085,6 @@ wipename (char *oldname, char const *qoldname, struct Options const *flags)
                 first = false;
               }
             memcpy (oldname + (base - newname), base, len + 1);
-            break;
           }
       }
 
@@ -1287,7 +1254,8 @@ main (int argc, char **argv)
 
   randint_source = randint_all_new (random_source, SIZE_MAX);
   if (! randint_source)
-    die (EXIT_FAILURE, errno, "%s", quotef (random_source));
+    die (EXIT_FAILURE, errno, "%s",
+         quotef (random_source ? random_source : "getrandom"));
   atexit (clear_random_data);
 
   for (i = 0; i < n_files; i++)

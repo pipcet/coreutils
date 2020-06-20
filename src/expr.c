@@ -1,5 +1,5 @@
 /* expr -- evaluate expressions.
-   Copyright (C) 1986-2017 Free Software Foundation, Inc.
+   Copyright (C) 1986-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Author: Mike Parker.
    Modified for arbitrary-precision calculation by James Youngman.
@@ -60,7 +60,7 @@ static void mpz_init_set_ui (mpz_t z, unsigned long int i) { z[0] = i; }
 static int
 mpz_init_set_str (mpz_t z, char *s, int base)
 {
-  return xstrtoimax (s, NULL, base, z, NULL) == LONGINT_OK ? 0 : -1;
+  return xstrtoimax (s, NULL, base, z, "") == LONGINT_OK ? 0 : -1;
 }
 static void
 mpz_add (mpz_t r, mpz_t a0, mpz_t b0)
@@ -113,7 +113,7 @@ mpz_tdiv_r (mpz_t r, mpz_t a0, mpz_t b0)
   /* Some x86-style hosts raise an exception for INT_MIN % -1.  */
   r[0] = a < - INTMAX_MAX && b == -1 ? 0 : a % b;
 }
-static char *
+static char * _GL_ATTRIBUTE_MALLOC
 mpz_get_str (char const *str, int base, mpz_t z)
 {
   (void) str; (void) base;
@@ -413,12 +413,6 @@ or 0, 2 if EXPRESSION is syntactically invalid, and 3 if an error occurred.\n\
   exit (status);
 }
 
-/* Report a syntax error and exit.  */
-static void
-syntax_error (void)
-{
-  die (EXPR_INVALID, 0, _("syntax error"));
-}
 
 #if ! HAVE_GMP
 /* Report an integer overflow for operation OP and exit.  */
@@ -465,7 +459,9 @@ main (int argc, char **argv)
 
   v = eval (true);
   if (!nomoreargs ())
-    syntax_error ();
+    die (EXPR_INVALID, 0, _("syntax error: unexpected argument %s"),
+         quotearg_n_style (0, locale_quoting_style, *args));
+
   printv (v);
 
   return null (v);
@@ -659,6 +655,18 @@ nomoreargs (void)
   return *args == 0;
 }
 
+/* Report missing operand.
+   There is an implicit assumption that there was a previous argument,
+   and (args-1) is valid. */
+static void
+require_more_args (void)
+{
+  if (nomoreargs ())
+    die (EXPR_INVALID, 0, _("syntax error: missing argument after %s"),
+         quotearg_n_style (0, locale_quoting_style, *(args-1)));
+}
+
+
 #ifdef EVAL_TRACE
 /* Print evaluation trace and args remaining.  */
 
@@ -759,19 +767,22 @@ eval7 (bool evaluate)
 #ifdef EVAL_TRACE
   trace ("eval7");
 #endif
-  if (nomoreargs ())
-    syntax_error ();
+  require_more_args ();
 
   if (nextarg ("("))
     {
       v = eval (evaluate);
+      if (nomoreargs ())
+        die (EXPR_INVALID, 0, _("syntax error: expecting ')' after %s"),
+             quotearg_n_style (0, locale_quoting_style, *(args-1)));
       if (!nextarg (")"))
-        syntax_error ();
+        die (EXPR_INVALID, 0, _("syntax error: expecting ')' instead of %s"),
+             quotearg_n_style (0, locale_quoting_style, *args));
       return v;
     }
 
   if (nextarg (")"))
-    syntax_error ();
+    die (EXPR_INVALID, 0, _("syntax error: unexpected ')'"));
 
   return str_value (*args++);
 }
@@ -792,8 +803,7 @@ eval6 (bool evaluate)
 #endif
   if (nextarg ("+"))
     {
-      if (nomoreargs ())
-        syntax_error ();
+      require_more_args ();
       return str_value (*args++);
     }
   else if (nextarg ("length"))
@@ -848,6 +858,7 @@ eval6 (bool evaluate)
 
           char *s = mbs_logical_substr (l->u.s, pos, len);
           v = str_value (s);
+          free (s);
         }
       freev (l);
       freev (i1);

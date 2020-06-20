@@ -1,7 +1,7 @@
 #!/bin/sh
 # Ensure we handle i/o errors correctly in csplit
 
-# Copyright (C) 2015-2017 Free Software Foundation, Inc.
+# Copyright (C) 2015-2020 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
 print_ver_ csplit
@@ -39,9 +39,23 @@ cat > k.c <<'EOF' || framework_failure_
 size_t
 fwrite (const void *ptr, size_t size, size_t nitems, FILE *stream)
 {
-  fclose (fopen ("preloaded","w")); /* marker for preloaded interception */
-  errno = ENOSPC;
-  return 0;
+  if (stream == stderr)
+    {
+      /* Perform the normal operation of fwrite.  */
+      const char *p = ptr;
+      size_t count = size * nitems;
+      size_t i;
+      for (i = 0; i < count; i++)
+        if (putc ((unsigned char) *p++, stream) == EOF)
+          break;
+      return i / size;
+    }
+  else
+    {
+      fclose (fopen ("preloaded","w")); /* marker for preloaded interception */
+      errno = ENOSPC;
+      return 0;
+    }
 }
 
 size_t

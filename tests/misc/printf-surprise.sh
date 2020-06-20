@@ -1,7 +1,7 @@
 #!/bin/sh
 # Detect printf(3) failure even when it doesn't set stream error indicator
 
-# Copyright (C) 2007-2017 Free Software Foundation, Inc.
+# Copyright (C) 2007-2020 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 prog=printf
 
@@ -49,9 +49,7 @@ vm=$(get_min_ulimit_v_ env $prog %20f 0) \
 # triggering the printf(3) misbehavior -- which, btw, is required by ISO C99.
 
 mkfifo_or_skip_ fifo
-
-(trap '' PIPE && yes | :) 2>&1 | grep -qF 'Broken pipe' ||
-    skip_ 'trapping SIGPIPE is not supported'
+trap_sigpipe_or_skip_
 
 # Disable MALLOC_PERTURB_, to avoid triggering this bug
 # https://bugs.debian.org/481543#77

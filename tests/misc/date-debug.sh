@@ -1,7 +1,7 @@
 #!/bin/sh
 # Test 'date --debug' option.
 
-# Copyright (C) 2016-2017 Free Software Foundation, Inc.
+# Copyright (C) 2016-2020 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
 print_ver_ date
@@ -71,7 +71,7 @@ date: input timezone: TZ="America/Edmonton" in date string
 date: using specified time as starting value: '02:30:00'
 date: error: invalid date/time value:
 date:     user provided time: '(Y-M-D) 2006-04-02 02:30:00'
-date:        normalized time: '(Y-M-D) 2006-04-02 03:30:00'
+date:        normalized time: '(Y-M-D) 2006-04-02 XX:XX:XX'
 date:                                             --
 date:      possible reasons:
 date:        non-existing due to daylight-saving time;
@@ -81,7 +81,14 @@ date: invalid date 'TZ="America/Edmonton" 2006-04-02 02:30:00'
 EOF
 
 # date should return 1 (error) for invalid date
-returns_ 1 date --debug -d "$in2" >out2 2>&1 || fail=1
+returns_ 1 date --debug -d "$in2" >out2-t 2>&1 || fail=1
+
+# The output line of "normalized time" can differ between systems
+# (e.g. glibc vs musl) and should not be checked.
+# See: https://lists.gnu.org/archive/html/coreutils/2019-05/msg00039.html
+sed '/normalized time:/s/ [0-9][0-9]:[0-9][0-9]:[0-9][0-9]/ XX:XX:XX/' \
+    out2-t > out2 || framework_failure_
+
 compare exp2 out2 || fail=1
 
 ##
@@ -104,7 +111,7 @@ compare exp3 out3 || fail=1
 ##
 ## Parsing a lone number.
 ## Fixed in gnulib v0.1-1099-gf2d4b5c
-## http://git.savannah.gnu.org/cgit/gnulib.git/commit/?id=f2d4b5caa
+## https://git.savannah.gnu.org/cgit/gnulib.git/commit/?id=f2d4b5caa
 cat<<EOF>exp4
 date: parsed number part: (Y-M-D) 2013-01-01
 date: input timezone: TZ="UTC0" environment value or -u
@@ -125,7 +132,7 @@ compare exp4 out4 || fail=1
 ##
 ## Parsing a relative number after a timezone string
 ## Fixed in gnulib v0.1-1100-g5c438e8
-## http://git.savannah.gnu.org/cgit/gnulib.git/commit/?id=5c438e8ce7d
+## https://git.savannah.gnu.org/cgit/gnulib.git/commit/?id=5c438e8ce7d
 cat<<EOF>exp5
 date: parsed date part: (Y-M-D) 2013-10-30
 date: parsed time part: 00:00:00
@@ -152,7 +159,7 @@ compare exp5 out5 || fail=1
 ##
 ## Explicitly warn about unexpected day/month shifts.
 ## added in gnulib v0.1-1101-gf14eff1
-## http://git.savannah.gnu.org/cgit/gnulib.git/commit/?id=f14eff1b3cde2b
+## https://git.savannah.gnu.org/cgit/gnulib.git/commit/?id=f14eff1b3cde2b
 TOOLONG='it is recommended to specify the 15th of the months'
 cat<<EOF>exp6
 date: parsed date part: (Y-M-D) 2016-10-31
@@ -181,7 +188,7 @@ compare exp6 out6 || fail=1
 ##
 ## Explicitly warn about crossing DST boundaries.
 ## added in gnulib v0.1-1102-g30a55dd
-## http://git.savannah.gnu.org/cgit/gnulib.git/commit/?id=30a55dd72dad2
+## https://git.savannah.gnu.org/cgit/gnulib.git/commit/?id=30a55dd72dad2
 TOOLONG2='it is recommended to specify the 15th of the months'
 cat<<EOF>exp7
 date: parsed date part: (Y-M-D) 2016-06-01
@@ -212,7 +219,7 @@ compare exp7 out7 || fail=1
 
 ## fix local timezone debug messages.
 ## fixed in git v0.1-1103-gc56e7fb
-## http://git.savannah.gnu.org/cgit/gnulib.git/commit/?id=c56e7fbb032
+## https://git.savannah.gnu.org/cgit/gnulib.git/commit/?id=c56e7fbb032
 
 cat<<EOF>exp8_1
 date: parsed date part: (Y-M-D) 2011-12-11
@@ -252,7 +259,7 @@ compare exp8_2 out8_2 || fail=1
 
 ## fix debug message on lone year number (The "2011" part).
 ## fixed in gnulib v0.1-1104-g15b8f30
-## http://git.savannah.gnu.org/cgit/gnulib.git/commit/?id=15b8f3046a25
+## https://git.savannah.gnu.org/cgit/gnulib.git/commit/?id=15b8f3046a25
 ##
 ## NOTE:
 ## When the date 'Apr 11' is parsed, the year part will be the

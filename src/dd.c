@@ -1,5 +1,5 @@
 /* dd -- convert a file while copying it.
-   Copyright (C) 1985-2017 Free Software Foundation, Inc.
+   Copyright (C) 1985-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Written by Paul Rubin, David MacKenzie, and Stuart Kemp. */
 
@@ -22,7 +22,6 @@
 
 #include <sys/types.h>
 #include <signal.h>
-#include <getopt.h>
 
 #include "system.h"
 #include "close-stream.h"
@@ -31,6 +30,7 @@
 #include "fd-reopen.h"
 #include "gethrxtime.h"
 #include "human.h"
+#include "ioblksize.h"
 #include "long-options.h"
 #include "quote.h"
 #include "verror.h"
@@ -242,10 +242,14 @@ static uintmax_t r_truncate = 0;
 static char newline_character = '\n';
 static char space_character = ' ';
 
-/* Input buffer. */
-static char *ibuf;
+#ifdef lint
+/* Memory blocks allocated for I/O buffers and surrounding areas.  */
+static char *real_ibuf;
+static char *real_obuf;
+#endif
 
-/* Output buffer. */
+/* I/O buffers.  */
+static char *ibuf;
 static char *obuf;
 
 /* Current index into 'obuf'. */
@@ -265,6 +269,9 @@ static sig_atomic_t volatile info_signal_count;
 
 /* Whether to discard cache for input or output.  */
 static bool i_nocache, o_nocache;
+
+/* Whether to instruct the kernel to discard the complete file.  */
+static bool i_nocache_eof, o_nocache_eof;
 
 /* Function used for read (to handle iflag=fullblock parameter).  */
 static ssize_t (*iread_fnc) (int fd, char *buf, size_t size);
@@ -526,7 +533,7 @@ maybe_close_stdout (void)
     _exit (EXIT_FAILURE);
 }
 
-/* Like error() but handle any pending newline.  */
+/* Like the 'error' function but handle any pending newline.  */
 
 static void _GL_ATTRIBUTE_FORMAT ((__printf__, 3, 4))
 nl_error (int status, int errnum, const char *fmt, ...)
@@ -583,8 +590,9 @@ Copy a file, converting and formatting according to the operands.\n\
       fputs (_("\
 \n\
 N and BYTES may be followed by the following multiplicative suffixes:\n\
-c =1, w =2, b =512, kB =1000, K =1024, MB =1000*1000, M =1024*1024, xM =M,\n\
-GB =1000*1000*1000, G =1024*1024*1024, and so on for T, P, E, Z, Y.\n\
+c=1, w=2, b=512, kB=1000, K=1024, MB=1000*1000, M=1024*1024, xM=M,\n\
+GB=1000*1000*1000, G=1024*1024*1024, and so on for T, P, E, Z, Y.\n\
+Binary prefixes can be used, too: KiB=K, MiB=M, and so on.\n\
 \n\
 Each CONV symbol may be:\n\
 \n\
@@ -597,7 +605,7 @@ Each CONV symbol may be:\n\
   unblock   replace trailing spaces in cbs-size records with newline\n\
   lcase     change upper case to lower case\n\
   ucase     change lower case to upper case\n\
-  sparse    try to seek rather than write the output for NUL input blocks\n\
+  sparse    try to seek rather than write all-NUL output blocks\n\
   swab      swap every pair of input bytes\n\
   sync      pad every input block with NULs to ibs-size; when used\n\
             with block or unblock, pad with spaces rather than NULs\n\
@@ -689,8 +697,8 @@ alloc_ibuf (void)
   if (ibuf)
     return;
 
-  char *real_buf = malloc (input_blocksize + INPUT_BLOCK_SLOP);
-  if (!real_buf)
+  char *buf = malloc (input_blocksize + INPUT_BLOCK_SLOP);
+  if (!buf)
     {
       uintmax_t ibs = input_blocksize;
       char hbuf[LONGEST_HUMAN_READABLE + 1];
@@ -700,10 +708,10 @@ alloc_ibuf (void)
            human_readable (input_blocksize, hbuf,
                            human_opts | human_base_1024, 1, 1));
     }
-
-  real_buf += SWAB_ALIGN_OFFSET;	/* allow space for swab */
-
-  ibuf = ptr_align (real_buf, page_size);
+#ifdef lint
+  real_ibuf = buf;
+#endif
+  ibuf = ptr_align (buf + SWAB_ALIGN_OFFSET, page_size);
 }
 
 /* Ensure output buffer OBUF is allocated/initialized.  */
@@ -717,8 +725,8 @@ alloc_obuf (void)
   if (conversions_mask & C_TWOBUFS)
     {
       /* Page-align the output buffer, too.  */
-      char *real_obuf = malloc (output_blocksize + OUTPUT_BLOCK_SLOP);
-      if (!real_obuf)
+      char *buf = malloc (output_blocksize + OUTPUT_BLOCK_SLOP);
+      if (!buf)
         {
           uintmax_t obs = output_blocksize;
           char hbuf[LONGEST_HUMAN_READABLE + 1];
@@ -729,7 +737,10 @@ alloc_obuf (void)
                human_readable (output_blocksize, hbuf,
                                human_opts | human_base_1024, 1, 1));
         }
-      obuf = ptr_align (real_obuf, page_size);
+#ifdef lint
+      real_obuf = buf;
+#endif
+      obuf = ptr_align (buf, page_size);
     }
   else
     {
@@ -910,8 +921,8 @@ install_signal_handlers (void)
     {
       act.sa_handler = siginfo_handler;
       /* Note we don't use SA_RESTART here and instead
-         handle EINTR explicitly in iftruncate() etc.
-         to avoid blocking on noncommitted read()/write() calls.  */
+         handle EINTR explicitly in iftruncate etc.
+         to avoid blocking on noncommitted read/write calls.  */
       act.sa_flags = 0;
       sigaction (SIGINFO, &act, NULL);
     }
@@ -938,16 +949,40 @@ install_signal_handlers (void)
 #endif
 }
 
+/* Close FD.  Return 0 if successful, -1 (setting errno) otherwise.
+   If close fails with errno == EINTR, POSIX says the file descriptor
+   is in an unspecified state, so keep trying to close FD but do not
+   consider EBADF to be an error.  Do not process signals.  This all
+   differs somewhat from functions like ifdatasync and ifsync.  */
+static int
+iclose (int fd)
+{
+  if (close (fd) != 0)
+    do
+      if (errno != EINTR)
+        return -1;
+    while (close (fd) != 0 && errno != EBADF);
+
+  return 0;
+}
+
 static void
 cleanup (void)
 {
-  if (close (STDIN_FILENO) < 0)
+#ifdef lint
+  free (real_ibuf);
+  free (real_obuf);
+  real_ibuf = NULL;
+  real_obuf = NULL;
+#endif
+
+  if (iclose (STDIN_FILENO) != 0)
     die (EXIT_FAILURE, errno, _("closing input file %s"), quoteaf (input_file));
 
   /* Don't remove this call to close, even though close_stdout
      closes standard output.  This close is necessary when cleanup
-     is called as part of a signal handler.  */
-  if (close (STDOUT_FILENO) < 0)
+     is called as a consequence of signal handling.  */
+  if (iclose (STDOUT_FILENO) != 0)
     die (EXIT_FAILURE, errno,
          _("closing output file %s"), quoteaf (output_file));
 }
@@ -988,9 +1023,10 @@ process_signals (void)
 static void
 finish_up (void)
 {
+  /* Process signals first, so that cleanup is called at most once.  */
+  process_signals ();
   cleanup ();
   print_stats ();
-  process_signals ();
 }
 
 static void ATTRIBUTE_NORETURN
@@ -1000,7 +1036,8 @@ quit (int code)
   exit (code);
 }
 
-/* Return LEN rounded down to a multiple of PAGE_SIZE
+/* Return LEN rounded down to a multiple of IO_BUFSIZE
+   (to minimize calls to the expensive posix_fadvise(,POSIX_FADV_DONTNEED),
    while storing the remainder internally per FD.
    Pass LEN == 0 to get the current remainder.  */
 
@@ -1013,7 +1050,7 @@ cache_round (int fd, off_t len)
   if (len)
     {
       uintmax_t c_pending = *pending + len;
-      *pending = c_pending % page_size;
+      *pending = c_pending % IO_BUFSIZE;
       if (c_pending > *pending)
         len = c_pending - *pending;
       else
@@ -1033,54 +1070,64 @@ static bool
 invalidate_cache (int fd, off_t len)
 {
   int adv_ret = -1;
+  off_t offset;
+  bool nocache_eof = (fd == STDIN_FILENO ? i_nocache_eof : o_nocache_eof);
 
   /* Minimize syscalls.  */
   off_t clen = cache_round (fd, len);
   if (len && !clen)
     return true; /* Don't advise this time.  */
-  if (!len && !clen && max_records)
-    return true; /* Nothing pending.  */
+  else if (! len && ! clen && ! nocache_eof)
+    return true;
   off_t pending = len ? cache_round (fd, 0) : 0;
 
   if (fd == STDIN_FILENO)
     {
       if (input_seekable)
-        {
-          /* Note we're being careful here to only invalidate what
-             we've read, so as not to dump any read ahead cache.  */
-#if HAVE_POSIX_FADVISE
-            adv_ret = posix_fadvise (fd, input_offset - clen - pending, clen,
-                                     POSIX_FADV_DONTNEED);
-#else
-            errno = ENOTSUP;
-#endif
-        }
+        offset = input_offset;
       else
-        errno = ESPIPE;
+        {
+          offset = -1;
+          errno = ESPIPE;
+        }
     }
-  else if (fd == STDOUT_FILENO)
+  else
     {
       static off_t output_offset = -2;
 
       if (output_offset != -1)
         {
-          if (0 > output_offset)
-            {
-              output_offset = lseek (fd, 0, SEEK_CUR);
-              output_offset -= clen + pending;
-            }
-          if (0 <= output_offset)
-            {
-#if HAVE_POSIX_FADVISE
-              adv_ret = posix_fadvise (fd, output_offset, clen,
-                                       POSIX_FADV_DONTNEED);
-#else
-              errno = ENOTSUP;
-#endif
-              output_offset += clen + pending;
-            }
+          if (output_offset < 0)
+            output_offset = lseek (fd, 0, SEEK_CUR);
+          else if (len)
+            output_offset += clen + pending;
         }
+
+      offset = output_offset;
     }
+
+  if (0 <= offset)
+   {
+     if (! len && clen && nocache_eof)
+       {
+         pending = clen;
+         clen = 0;
+       }
+
+     /* Note we're being careful here to only invalidate what
+        we've read, so as not to dump any read ahead cache.
+        Note also the kernel is conservative and only invalidates
+        full pages in the specified range.  */
+#if HAVE_POSIX_FADVISE
+     offset = offset - clen - pending;
+     /* ensure full page specified when invalidating to eof.  */
+     if (clen == 0)
+       offset -= offset % page_size;
+     adv_ret = posix_fadvise (fd, offset, clen, POSIX_FADV_DONTNEED);
+#else
+     errno = ENOTSUP;
+#endif
+   }
 
   return adv_ret != -1 ? true : false;
 }
@@ -1093,11 +1140,21 @@ static ssize_t
 iread (int fd, char *buf, size_t size)
 {
   ssize_t nread;
+  static ssize_t prev_nread;
 
   do
     {
       process_signals ();
       nread = read (fd, buf, size);
+      /* Ignore final read error with iflag=direct as that
+         returns EINVAL due to the non aligned file offset.  */
+      if (nread == -1 && errno == EINVAL
+          && 0 < prev_nread && prev_nread < size
+          && (input_flags & O_DIRECT))
+        {
+          errno = 0;
+          nread = 0;
+        }
     }
   while (nread < 0 && errno == EINTR);
 
@@ -1107,8 +1164,6 @@ iread (int fd, char *buf, size_t size)
 
   if (0 < nread && warn_partial_read)
     {
-      static ssize_t prev_nread;
-
       if (0 < prev_nread && prev_nread < size)
         {
           uintmax_t prev = prev_nread;
@@ -1121,10 +1176,9 @@ iread (int fd, char *buf, size_t size)
                    prev);
           warn_partial_read = false;
         }
-
-      prev_nread = nread;
     }
 
+  prev_nread = nread;
   return nread;
 }
 
@@ -1168,15 +1222,19 @@ iwrite (int fd, char const *buf, size_t size)
                quotef (output_file));
 
       /* Since we have just turned off O_DIRECT for the final write,
-         here we try to preserve some of its semantics.  First, use
-         posix_fadvise to tell the system not to pollute the buffer
-         cache with this data.  Don't bother to diagnose lseek or
-         posix_fadvise failure. */
+         we try to preserve some of its semantics.  */
+
+      /* Call invalidate_cache to setup the appropriate offsets
+         for subsequent calls.  */
+      o_nocache_eof = true;
       invalidate_cache (STDOUT_FILENO, 0);
 
       /* Attempt to ensure that that final block is committed
          to disk as quickly as possible.  */
       conversions_mask |= C_FSYNC;
+
+      /* After the subsequent fsync we'll call invalidate_cache
+         to attempt to clear all data from the page cache.  */
     }
 
   while (total_written < size)
@@ -1245,7 +1303,24 @@ write_output (void)
   oc = 0;
 }
 
-/* Restart on EINTR from fd_reopen().  */
+/* Restart on EINTR from fdatasync.  */
+
+static int
+ifdatasync (int fd)
+{
+  int ret;
+
+  do
+    {
+      process_signals ();
+      ret = fdatasync (fd);
+    }
+  while (ret < 0 && errno == EINTR);
+
+  return ret;
+}
+
+/* Restart on EINTR from fd_reopen.  */
 
 static int
 ifd_reopen (int desired_fd, char const *file, int flag, mode_t mode)
@@ -1262,7 +1337,41 @@ ifd_reopen (int desired_fd, char const *file, int flag, mode_t mode)
   return ret;
 }
 
-/* Restart on EINTR from ftruncate().  */
+/* Restart on EINTR from fstat.  */
+
+static int
+ifstat (int fd, struct stat *st)
+{
+  int ret;
+
+  do
+    {
+      process_signals ();
+      ret = fstat (fd, st);
+    }
+  while (ret < 0 && errno == EINTR);
+
+  return ret;
+}
+
+/* Restart on EINTR from fsync.  */
+
+static int
+ifsync (int fd)
+{
+  int ret;
+
+  do
+    {
+      process_signals ();
+      ret = fsync (fd);
+    }
+  while (ret < 0 && errno == EINTR);
+
+  return ret;
+}
+
+/* Restart on EINTR from ftruncate.  */
 
 static int
 iftruncate (int fd, off_t length)
@@ -1562,11 +1671,13 @@ scanargs (int argc, char *const *argv)
   if (input_flags & O_NOCACHE)
     {
       i_nocache = true;
+      i_nocache_eof = (max_records == 0 && max_bytes == 0);
       input_flags &= ~O_NOCACHE;
     }
   if (output_flags & O_NOCACHE)
     {
       o_nocache = true;
+      o_nocache_eof = (max_records == 0 && max_bytes == 0);
       output_flags &= ~O_NOCACHE;
     }
 }
@@ -1687,7 +1798,7 @@ advance_input_offset (uintmax_t offset)
    The offending behavior has been confirmed with an Exabyte SCSI tape
    drive accessed via /dev/nst0 on both Linux 2.2.17 and 2.4.16 kernels.  */
 
-#ifdef __linux__
+#if defined __linux__ && HAVE_SYS_MTIO_H
 
 # include <sys/mtio.h>
 
@@ -1752,7 +1863,7 @@ skip (int fdesc, char const *file, uintmax_t records, size_t blocksize,
       if (fdesc == STDIN_FILENO)
         {
            struct stat st;
-           if (fstat (STDIN_FILENO, &st) != 0)
+           if (ifstat (STDIN_FILENO, &st) != 0)
              die (EXIT_FAILURE, errno, _("cannot fstat %s"), quoteaf (file));
            if (usable_st_size (&st) && st.st_size < input_offset + offset)
              {
@@ -2008,7 +2119,7 @@ set_fd_flags (int fd, int add_flags, char const *name)
               /* NEW_FLAGS contains at least one file creation flag that
                  requires some checking of the open file descriptor.  */
               struct stat st;
-              if (fstat (fd, &st) != 0)
+              if (ifstat (fd, &st) != 0)
                 ok = false;
               else if ((new_flags & O_DIRECTORY) && ! S_ISDIR (st.st_mode))
                 {
@@ -2149,13 +2260,19 @@ dd_copy (void)
       else
         nread = iread_fnc (STDIN_FILENO, ibuf, input_blocksize);
 
-      if (nread >= 0 && i_nocache)
-        invalidate_cache (STDIN_FILENO, nread);
-
-      if (nread == 0)
-        break;			/* EOF.  */
-
-      if (nread < 0)
+      if (nread > 0)
+        {
+          advance_input_offset (nread);
+          if (i_nocache)
+            invalidate_cache (STDIN_FILENO, nread);
+        }
+      else if (nread == 0)
+        {
+          i_nocache_eof |= i_nocache;
+          o_nocache_eof |= o_nocache && ! (conversions_mask & C_NOTRUNC);
+          break;			/* EOF.  */
+        }
+      else
         {
           if (!(conversions_mask & C_NOERROR) || status_level != STATUS_NONE)
             error (0, errno, _("error reading %s"), quoteaf (input_file));
@@ -2194,7 +2311,6 @@ dd_copy (void)
         }
 
       n_bytes_read = nread;
-      advance_input_offset (nread);
 
       if (n_bytes_read < input_blocksize)
         {
@@ -2294,7 +2410,7 @@ dd_copy (void)
   if (final_op_was_seek)
     {
       struct stat stdout_stat;
-      if (fstat (STDOUT_FILENO, &stdout_stat) != 0)
+      if (ifstat (STDOUT_FILENO, &stdout_stat) != 0)
         {
           error (0, errno, _("cannot fstat %s"), quoteaf (output_file));
           return EXIT_FAILURE;
@@ -2316,7 +2432,7 @@ dd_copy (void)
         }
     }
 
-  if ((conversions_mask & C_FDATASYNC) && fdatasync (STDOUT_FILENO) != 0)
+  if ((conversions_mask & C_FDATASYNC) && ifdatasync (STDOUT_FILENO) != 0)
     {
       if (errno != ENOSYS && errno != EINVAL)
         {
@@ -2326,13 +2442,11 @@ dd_copy (void)
       conversions_mask |= C_FSYNC;
     }
 
-  if (conversions_mask & C_FSYNC)
-    while (fsync (STDOUT_FILENO) != 0)
-      if (errno != EINTR)
-        {
-          error (0, errno, _("fsync failed for %s"), quoteaf (output_file));
-          return EXIT_FAILURE;
-        }
+  if ((conversions_mask & C_FSYNC) && ifsync (STDOUT_FILENO) != 0)
+    {
+      error (0, errno, _("fsync failed for %s"), quoteaf (output_file));
+      return EXIT_FAILURE;
+    }
 
   return exit_status;
 }
@@ -2357,12 +2471,9 @@ main (int argc, char **argv)
 
   page_size = getpagesize ();
 
-  parse_long_options (argc, argv, PROGRAM_NAME, PACKAGE, Version,
-                      usage, AUTHORS, (char const *) NULL);
+  parse_gnu_standard_options_only (argc, argv, PROGRAM_NAME, PACKAGE, Version,
+                                   true, usage, AUTHORS, (char const *) NULL);
   close_stdout_required = false;
-
-  if (getopt_long (argc, argv, "", NULL, NULL) != -1)
-    usage (EXIT_FAILURE);
 
   /* Initialize translation table to identity translation. */
   for (i = 0; i < 256; i++)
@@ -2435,7 +2546,7 @@ main (int argc, char **argv)
                  fails on /dev/fd0.  */
               int ftruncate_errno = errno;
               struct stat stdout_stat;
-              if (fstat (STDOUT_FILENO, &stdout_stat) != 0)
+              if (ifstat (STDOUT_FILENO, &stdout_stat) != 0)
                 die (EXIT_FAILURE, errno, _("cannot fstat %s"),
                      quoteaf (output_file));
               if (S_ISREG (stdout_stat.st_mode)
@@ -2470,13 +2581,12 @@ main (int argc, char **argv)
           exit_status = EXIT_FAILURE;
         }
     }
-  else if (max_records != (uintmax_t) -1)
+  else
     {
-      /* Invalidate any pending region less than page size,
-         in case the kernel might round up.  */
-      if (i_nocache)
+      /* Invalidate any pending region or to EOF if appropriate.  */
+      if (i_nocache || i_nocache_eof)
         invalidate_cache (STDIN_FILENO, 0);
-      if (o_nocache)
+      if (o_nocache || o_nocache_eof)
         invalidate_cache (STDOUT_FILENO, 0);
     }
 

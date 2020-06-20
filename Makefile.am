@@ -1,6 +1,6 @@
 # Make coreutils.					-*-Makefile-*-
 
-# Copyright (C) 1990-2017 Free Software Foundation, Inc.
+# Copyright (C) 1990-2020 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,19 +13,13 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ALL_RECURSIVE_TARGETS =
 
 SUBDIRS = po . gnulib-tests
 
-changelog_etc =				\
-  build-aux/ChangeLog-2007		\
-  lib/ChangeLog-2007			\
-  m4/ChangeLog-2007
-
 EXTRA_DIST =				\
-  $(changelog_etc)			\
   .mailmap				\
   .prev-version				\
   .version				\
@@ -99,7 +93,7 @@ dist-hook: gen-ChangeLog
 	$(AM_V_at)touch $(distdir)/doc/constants.texi \
 	  $(distdir)/doc/coreutils.info
 
-gen_start_ver = 8.15
+gen_start_ver = 8.23
 .PHONY: gen-ChangeLog
 gen-ChangeLog:
 	$(AM_V_GEN)if test -d .git; then				\
@@ -126,7 +120,7 @@ THANKS-to-translators: po/LINGUAS THANKStt.in
 	$(AM_V_GEN)(							\
 	  cat $(srcdir)/THANKStt.in;					\
 	  for lang in `cat $(srcdir)/po/LINGUAS`; do			\
-	    echo http://translationproject.org/team/$$lang.html;	\
+	    echo https://translationproject.org/team/$$lang.html;	\
 	  done;								\
 	) > $@-tmp && mv $@-tmp $@
 

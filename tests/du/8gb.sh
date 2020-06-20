@@ -2,7 +2,7 @@
 # Ensure that du does not rely on narrow types like size_t for
 # file sizes or sums.
 
-# Copyright (C) 2003-2017 Free Software Foundation, Inc.
+# Copyright (C) 2003-2020 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,13 +15,14 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
 print_ver_ du
 require_sparse_support_
 
-dd bs=1 seek=8G of=big < /dev/null 2> /dev/null
+# timeout to avoid hang on GNU/Hurd from 2019
+timeout 10 dd bs=1 seek=8G of=big < /dev/null 2> /dev/null
 if test $? != 0; then
   skip_ 'cannot create a file large enough for this test; possibly
 because file offsets are only 32 bits on this file system'

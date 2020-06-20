@@ -1,7 +1,7 @@
 #!/bin/sh
 # Validate timeout parameter combinations
 
-# Copyright (C) 2008-2017 Free Software Foundation, Inc.
+# Copyright (C) 2008-2020 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
 print_ver_ timeout
@@ -31,27 +31,6 @@ returns_ 125 timeout --kill-after=invalid 1 sleep 0 || fail=1
 
 # invalid timeout suffix
 returns_ 125 timeout 42D sleep 0 || fail=1
-
-# It was seen on 32 bit Linux/HPPA that a kernel time_t overflowed,
-# thus causing the timer to fire immediately.
-# So verify that doesn't happen before checking large timeouts
-KERNEL_OVERFLOW_LIMIT=$(expr $TIME_T_MAX - $(date +%s) + 100) ||
-  skip_ "failed to adjust TIME_T_MAX $TIME_T_MAX"
-timeout $KERNEL_OVERFLOW_LIMIT sleep 0
-if test $? != 124; then
-  # timeout overflow
-  timeout $UINT_OFLOW sleep 0 || fail=1
-
-  # timeout overflow
-  timeout ${TIME_T_OFLOW}d sleep 0 || fail=1
-
-  # floating point notation
-  timeout 2.34e+5d sleep 0 || fail=1
-
-  # floating point overflow
-  timeout $LDBL_MAX sleep 0 || fail=1
-  returns_ 125 timeout -- -$LDBL_MAX sleep 0 || fail=1
-fi
 
 # floating point notation
 timeout 10.34 sleep 0 || fail=1
