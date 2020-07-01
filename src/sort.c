@@ -3369,7 +3369,7 @@ static void
 queue_destroy (struct merge_node_queue *queue)
 {
   heap_free (queue->priority_queue);
-  pthread_cond_destroy (&queue->cond);
+  //pthread_cond_destroy (&queue->cond);
   pthread_mutex_destroy (&queue->mutex);
 }
 
@@ -3384,7 +3384,7 @@ queue_init (struct merge_node_queue *queue, size_t nthreads)
      dummy head for the heap, reserve 2 * NTHREADS nodes.  */
   queue->priority_queue = heap_alloc (compare_nodes, 2 * nthreads);
   pthread_mutex_init (&queue->mutex, NULL);
-  pthread_cond_init (&queue->cond, NULL);
+  //pthread_cond_init (&queue->cond, NULL);
 }
 
 /* Insert NODE into QUEUE.  The caller either holds a lock on NODE, or
@@ -3396,7 +3396,7 @@ queue_insert (struct merge_node_queue *queue, struct merge_node *node)
   pthread_mutex_lock (&queue->mutex);
   heap_insert (queue->priority_queue, node);
   node->queued = true;
-  pthread_cond_signal (&queue->cond);
+  //pthread_cond_signal (&queue->cond);
   pthread_mutex_unlock (&queue->mutex);
 }
 
@@ -3408,7 +3408,7 @@ queue_pop (struct merge_node_queue *queue)
   struct merge_node *node;
   pthread_mutex_lock (&queue->mutex);
   while (! (node = heap_remove_top (queue->priority_queue)))
-    pthread_cond_wait (&queue->cond, &queue->mutex);
+    ;//pthread_cond_wait (&queue->cond, &queue->mutex);
   pthread_mutex_unlock (&queue->mutex);
   lock_node (node);
   node->queued = false;
