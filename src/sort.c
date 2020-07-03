@@ -3262,7 +3262,7 @@ merge_tree_init (size_t nthreads, size_t nlines, struct line *dest)
   root->parent = NULL;
   root->level = MERGE_END;
   root->queued = false;
-  pthread_mutex_init (&root->lock, NULL);
+  //pthread_mutex_init (&root->lock, NULL);
 
   init_node (root, root + 1, dest, nthreads, nlines, false);
   return merge_tree;
@@ -3277,7 +3277,7 @@ merge_tree_destroy (size_t nthreads, struct merge_node *merge_tree)
 
   while (n_nodes--)
     {
-      pthread_mutex_destroy (&node->lock);
+      //pthread_mutex_destroy (&node->lock);
       node++;
     }
 
@@ -3313,7 +3313,7 @@ init_node (struct merge_node *restrict parent,
   node->parent = parent;
   node->level = parent->level + 1;
   node->queued = false;
-  pthread_mutex_init (&node->lock, NULL);
+  //pthread_mutex_init (&node->lock, NULL);
 
   if (nthreads > 1)
     {
@@ -3352,7 +3352,7 @@ compare_nodes (void const *a, void const *b)
 static inline void
 lock_node (struct merge_node *node)
 {
-  pthread_mutex_lock (&node->lock);
+  //pthread_mutex_lock (&node->lock);
 }
 
 /* Unlock a merge tree NODE. */
@@ -3360,7 +3360,7 @@ lock_node (struct merge_node *node)
 static inline void
 unlock_node (struct merge_node *node)
 {
-  pthread_mutex_unlock (&node->lock);
+  //pthread_mutex_unlock (&node->lock);
 }
 
 /* Destroy merge QUEUE. */
@@ -3369,8 +3369,8 @@ static void
 queue_destroy (struct merge_node_queue *queue)
 {
   heap_free (queue->priority_queue);
-  pthread_cond_destroy (&queue->cond);
-  pthread_mutex_destroy (&queue->mutex);
+  //pthread_cond_destroy (&queue->cond);
+  //pthread_mutex_destroy (&queue->mutex);
 }
 
 /* Initialize merge QUEUE, allocating space suitable for a maximum of
@@ -3383,8 +3383,8 @@ queue_init (struct merge_node_queue *queue, size_t nthreads)
      time, the heap should accommodate all of them.  Counting a NULL
      dummy head for the heap, reserve 2 * NTHREADS nodes.  */
   queue->priority_queue = heap_alloc (compare_nodes, 2 * nthreads);
-  pthread_mutex_init (&queue->mutex, NULL);
-  pthread_cond_init (&queue->cond, NULL);
+  //pthread_mutex_init (&queue->mutex, NULL);
+  //pthread_cond_init (&queue->cond, NULL);
 }
 
 /* Insert NODE into QUEUE.  The caller either holds a lock on NODE, or
@@ -3393,11 +3393,11 @@ queue_init (struct merge_node_queue *queue, size_t nthreads)
 static void
 queue_insert (struct merge_node_queue *queue, struct merge_node *node)
 {
-  pthread_mutex_lock (&queue->mutex);
+  //pthread_mutex_lock (&queue->mutex);
   heap_insert (queue->priority_queue, node);
   node->queued = true;
-  pthread_cond_signal (&queue->cond);
-  pthread_mutex_unlock (&queue->mutex);
+  //pthread_cond_signal (&queue->cond);
+  //pthread_mutex_unlock (&queue->mutex);
 }
 
 /* Pop the top node off the priority QUEUE, lock the node, return it.  */
@@ -3406,10 +3406,10 @@ static struct merge_node *
 queue_pop (struct merge_node_queue *queue)
 {
   struct merge_node *node;
-  pthread_mutex_lock (&queue->mutex);
+  //pthread_mutex_lock (&queue->mutex);
   while (! (node = heap_remove_top (queue->priority_queue)))
-    pthread_cond_wait (&queue->cond, &queue->mutex);
-  pthread_mutex_unlock (&queue->mutex);
+    ;//pthread_cond_wait (&queue->cond, &queue->mutex);
+  //pthread_mutex_unlock (&queue->mutex);
   lock_node (node);
   node->queued = false;
   return node;
@@ -3655,11 +3655,11 @@ sortlines (struct line *restrict lines, size_t nthreads,
                              node->lo_child, queue, tfp, temp_output};
 
   if (nthreads > 1 && SUBTHREAD_LINES_HEURISTIC <= nlines
-      && pthread_create (&thread, NULL, sortlines_thread, &args) == 0)
+      && false)
     {
       sortlines (lines - node->nlo, hi_threads, total_lines,
                  node->hi_child, queue, tfp, temp_output);
-      pthread_join (thread, NULL);
+      //pthread_join (thread, NULL);
     }
   else
     {
