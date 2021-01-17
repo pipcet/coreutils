@@ -1,5 +1,5 @@
 /* tr -- a filter to translate characters
-   Copyright (C) 1991-2020 Free Software Foundation, Inc.
+   Copyright (C) 1991-2021 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1176,7 +1176,7 @@ validate_case_classes (struct Spec_list *s1, struct Spec_list *s2)
   bool s1_new_element = true;
   bool s2_new_element = true;
 
-  if (!s2->has_char_class)
+  if (complement || !s2->has_char_class)
     return;
 
   for (int i = 0; i < N_CHARS; i++)

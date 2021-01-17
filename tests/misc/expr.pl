@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # Basic tests for "expr".
 
-# Copyright (C) 2001-2020 Free Software Foundation, Inc.
+# Copyright (C) 2001-2021 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -192,10 +192,6 @@ my @Tests =
      ['se6', "'(' 2 a", {EXIT=>2},
       {ERR=>"$prog: syntax error: expecting ')' instead of 'a'\n"}],
     );
-
-# If using big numbers fails, remove all /^bignum-/ tests
-qx!expr $big_prod '*' $big_prod '*' $big_prod!
-  or @Tests = grep {$_->[0] !~ /^bignum-/} @Tests;
 
 # Append a newline to end of each expected 'OUT' string.
 my $t;

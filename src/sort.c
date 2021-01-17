@@ -1,5 +1,5 @@
 /* sort - sort lines of text (with all kinds of options).
-   Copyright (C) 1988-2020 Free Software Foundation, Inc.
+   Copyright (C) 1988-2021 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -757,7 +757,7 @@ delete_proc (pid_t pid)
   struct tempnode test;
 
   test.pid = pid;
-  struct tempnode *node = hash_delete (proctab, &test);
+  struct tempnode *node = hash_remove (proctab, &test);
   if (! node)
     return false;
   node->state = REAPED;
@@ -1651,7 +1651,7 @@ begfield (struct line const *line, struct keyfield const *key)
 /* Return the limit of (a pointer to the first character after) the field
    in LINE specified by KEY. */
 
-static char *
+static char * _GL_ATTRIBUTE_PURE
 limfield (struct line const *line, struct keyfield const *key)
 {
   char *ptr = line->text, *lim = ptr + line->length - 1;

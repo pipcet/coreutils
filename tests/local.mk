@@ -1,6 +1,6 @@
 ## Process this file with automake to produce Makefile.in -*-Makefile-*-.
 
-## Copyright (C) 2007-2020 Free Software Foundation, Inc.
+## Copyright (C) 2007-2021 Free Software Foundation, Inc.
 
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -136,6 +136,7 @@ all_root_tests =				\
   tests/rm/no-give-up.sh			\
   tests/rm/one-file-system.sh			\
   tests/rm/read-only.sh				\
+  tests/rm/empty-immutable-skip.sh		\
   tests/tail-2/append-only.sh			\
   tests/tail-2/end-of-device.sh			\
   tests/touch/now-owned-by-other.sh
@@ -286,6 +287,7 @@ all_tests =					\
   tests/misc/basenc.pl				\
   tests/misc/close-stdout.sh			\
   tests/misc/chroot-fail.sh			\
+  tests/misc/cksum.sh				\
   tests/misc/comm.pl				\
   tests/misc/csplit.sh				\
   tests/misc/csplit-1000.sh			\
@@ -613,7 +615,7 @@ all_tests =					\
   tests/ls/multihardlink.sh			\
   tests/ls/no-arg.sh				\
   tests/ls/no-cap.sh				\
-  tests/ls/proc-selinux-segfault.sh		\
+  tests/ls/selinux-segfault.sh			\
   tests/ls/quote-align.sh			\
   tests/ls/readdir-mountpoint-inode.sh		\
   tests/ls/recursive.sh				\

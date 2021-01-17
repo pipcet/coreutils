@@ -1,5 +1,5 @@
 /* 'dir', 'vdir' and 'ls' directory listing programs for GNU.
-   Copyright (C) 1985-2020 Free Software Foundation, Inc.
+   Copyright (C) 1985-2021 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1766,7 +1766,7 @@ main (int argc, char **argv)
                  Use its dev/ino numbers to remove the corresponding
                  entry from the active_dir_set hash table.  */
               struct dev_ino di = dev_ino_pop ();
-              struct dev_ino *found = hash_delete (active_dir_set, &di);
+              struct dev_ino *found = hash_remove (active_dir_set, &di);
               /* ASSERT_MATCHING_DEV_INO (thispend->realname, di); */
               assert (found);
               dev_ino_free (found);
@@ -3424,6 +3424,9 @@ gobble_file (char const *name, enum filetype type, ino_t inode,
              provokes an exit status of 1.  */
           file_failure (command_line_arg,
                         _("cannot access %s"), full_name);
+
+          f->scontext = UNKNOWN_SECURITY_CONTEXT;
+
           if (command_line_arg)
             return 0;
 

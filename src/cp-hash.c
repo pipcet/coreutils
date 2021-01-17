@@ -1,5 +1,5 @@
 /* cp-hash.c  -- file copying (hash search routines)
-   Copyright (C) 1989-2020 Free Software Foundation, Inc.
+   Copyright (C) 1989-2021 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -88,7 +88,7 @@ forget_created (ino_t ino, dev_t dev)
   probe.st_dev = dev;
   probe.name = NULL;
 
-  ent = hash_delete (src_to_dest, &probe);
+  ent = hash_remove (src_to_dest, &probe);
   if (ent)
     src_to_dest_free (ent);
 }

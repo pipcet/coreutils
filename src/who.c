@@ -1,5 +1,5 @@
 /* GNU's who.
-   Copyright (C) 1992-2020 Free Software Foundation, Inc.
+   Copyright (C) 1992-2021 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -450,8 +450,8 @@ make_id_equals_comment (STRUCT_UTMP const *utmp_ent)
   size_t utmpsize = sizeof UT_ID (utmp_ent);
   char *comment = xmalloc (strlen (_("id=")) + utmpsize + 1);
 
-  strcpy (comment, _("id="));
-  strncat (comment, UT_ID (utmp_ent), utmpsize);
+  char *p = stpcpy (comment, _("id="));
+  stzncpy (p, UT_ID (utmp_ent), utmpsize);
   return comment;
 }
 

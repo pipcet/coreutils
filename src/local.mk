@@ -1,7 +1,7 @@
 # Make coreutils programs.                             -*-Makefile-*-
 # This is included by the top-level Makefile.am.
 
-## Copyright (C) 1990-2020 Free Software Foundation, Inc.
+## Copyright (C) 1990-2021 Free Software Foundation, Inc.
 
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -250,12 +250,15 @@ src_stat_LDADD += $(LIB_SELINUX)
 # for nvlist_lookup_uint64_array
 src_stat_LDADD += $(LIB_NVPAIR)
 
-# for gettime, settime, utimecmp, utimens
+# for gettime, settime, tempname, utimecmp, utimens
 copy_ldadd += $(LIB_CLOCK_GETTIME)
 src_date_LDADD += $(LIB_CLOCK_GETTIME)
 src_ginstall_LDADD += $(LIB_CLOCK_GETTIME)
+src_ln_LDADD += $(LIB_CLOCK_GETTIME)
 src_ls_LDADD += $(LIB_CLOCK_GETTIME)
+src_mktemp_LDADD += $(LIB_CLOCK_GETTIME)
 src_pr_LDADD += $(LIB_CLOCK_GETTIME)
+src_tac_LDADD += $(LIB_CLOCK_GETTIME)
 src_timeout_LDADD += $(LIB_TIMER_TIME)
 src_touch_LDADD += $(LIB_CLOCK_GETTIME)
 
@@ -276,8 +279,8 @@ src_sort_LDADD += $(LIB_NANOSLEEP)
 src_tail_LDADD += $(LIB_NANOSLEEP)
 
 # for various GMP functions
-src_expr_LDADD += $(LIB_GMP)
-src_factor_LDADD += $(LIB_GMP)
+src_expr_LDADD += $(LIBGMP)
+src_factor_LDADD += $(LIBGMP)
 
 # for getloadavg
 src_uptime_LDADD += $(GETLOADAVG_LIBS)
@@ -355,6 +358,7 @@ src___SOURCES = src/lbracket.c
 nodist_src_coreutils_SOURCES = src/coreutils.h
 src_coreutils_SOURCES = src/coreutils.c
 
+src_cksum_SOURCES = src/cksum.c src/cksum.h
 src_cp_SOURCES = src/cp.c $(copy_sources) $(selinux_sources)
 src_dir_SOURCES = src/ls.c src/ls-dir.c
 src_env_SOURCES = src/env.c src/operand2sig.c
@@ -412,8 +416,6 @@ src_base32_SOURCES = src/basenc.c
 src_base32_CPPFLAGS = -DBASE_TYPE=32 $(AM_CPPFLAGS)
 src_basenc_SOURCES = src/basenc.c
 src_basenc_CPPFLAGS = -DBASE_TYPE=42 $(AM_CPPFLAGS)
-
-src_ginstall_CPPFLAGS = -DENABLE_MATCHPATHCON=1 $(AM_CPPFLAGS)
 
 src_expand_SOURCES = src/expand.c src/expand-common.c
 src_unexpand_SOURCES = src/unexpand.c src/expand-common.c
@@ -511,7 +513,7 @@ src/fs-magic-compare: src/fs-magic src/fs-kernel-magic src/fs-def
 
 CLEANFILES += src/fs-def
 src/fs-def: src/fs.h
-	grep '^# *define ' src/fs.h | $(ASSORT) > $@-t && mv $@-t $@
+	@grep '^# *define ' src/fs.h | $(ASSORT) > $@-t && mv $@-t $@
 
 # Massage bits of the statfs man page and definitions from
 # /usr/include/linux/magic.h to be in a form consistent with what's in fs.h.
@@ -525,6 +527,7 @@ fs_normalize_perl_subst =			\
   -e 's/AFS_FS/KAFS/;'				\
   -e 's/(_SUPER)?_MAGIC//;'			\
   -e 's/\s+0x(\S+)/" 0x" . uc $$1/e;'		\
+  -e 's/(\s+0x)(\X{2})\b/$${1}00$$2/;'		\
   -e 's/(\s+0x)(\X{3})\b/$${1}0$$2/;'		\
   -e 's/(\s+0x)(\X{6})\b/$${1}00$$2/;'		\
   -e 's/(\s+0x)(\X{7})\b/$${1}0$$2/;'		\

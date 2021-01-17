@@ -1,5 +1,5 @@
 /* seq - print sequence of numbers to standard output.
-   Copyright (C) 1994-2020 Free Software Foundation, Inc.
+   Copyright (C) 1994-2021 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@
 
 /* Limit below which seq_fast has more throughput.
    Determined with: seq 0 200 inf | pv > /dev/null  */
-#define SEQ_FAST_STEP_LIMIT 200
+#define SEQ_FAST_STEP_LIMIT 200  /* Keep in sync with texinfo description.  */
 #define SEQ_FAST_STEP_LIMIT_DIGITS 3
 
 /* The official name of this program (e.g., no 'g' prefix).  */

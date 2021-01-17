@@ -1,5 +1,5 @@
 /* factor -- print prime factors of n.
-   Copyright (C) 1986-2020 Free Software Foundation, Inc.
+   Copyright (C) 1986-2021 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -35,12 +35,6 @@
     The factoring code for two words will fall into the code for one word when
     progress allows that.
 
-    Using GMP is optional.  Define HAVE_GMP to make this code include GMP
-    factoring code.  The GMP factoring code is based on GMP's demos/factorize.c
-    (last synced 2012-09-07).  The GMP-based factoring code will stay in GMP
-    factoring code even if numbers get small enough for using the two-word
-    code.
-
   Algorithm:
 
     (1) Perform trial division using a small primes table, but without hardware
@@ -58,6 +52,11 @@
     Pollard-Brent rho code and the prime testing code, we use Montgomery's
     trick of multiplying all n-residues by the word base, allowing cheap Hensel
     reductions mod n.
+
+    The GMP code uses an algorithm that can be considerably slower;
+    for example, on a circa-2017 Intel Xeon Silver 4116, factoring
+    2^{127}-3 takes about 50 ms with the two-word algorithm but would
+    take about 750 ms with the GMP code.
 
   Improvements:
 
@@ -104,13 +103,7 @@
 #include <config.h>
 #include <getopt.h>
 #include <stdio.h>
-#if HAVE_GMP
-# include <gmp.h>
-# if !HAVE_DECL_MPZ_INITS
-#  include <stdarg.h>
-# endif
-#endif
-
+#include <gmp.h>
 #include <assert.h>
 
 #include "system.h"
@@ -246,14 +239,12 @@ struct factors
   unsigned char nfactors;
 };
 
-#if HAVE_GMP
 struct mp_factors
 {
   mpz_t             *p;
   unsigned long int *e;
   unsigned long int nfactors;
 };
-#endif
 
 static void factor (uintmax_t, uintmax_t, struct factors *);
 
@@ -570,12 +561,12 @@ factor_insert_large (struct factors *factors,
     factor_insert (factors, p0);
 }
 
-#if HAVE_GMP
+#ifndef mpz_inits
 
-# if !HAVE_DECL_MPZ_INITS
+# include <stdarg.h>
 
-#  define mpz_inits(...) mpz_va_init (mpz_init, __VA_ARGS__)
-#  define mpz_clears(...) mpz_va_init (mpz_clear, __VA_ARGS__)
+# define mpz_inits(...) mpz_va_init (mpz_init, __VA_ARGS__)
+# define mpz_clears(...) mpz_va_init (mpz_clear, __VA_ARGS__)
 
 static void
 mpz_va_init (void (*mpz_single_init)(mpz_t), ...)
@@ -590,7 +581,7 @@ mpz_va_init (void (*mpz_single_init)(mpz_t), ...)
 
   va_end (ap);
 }
-# endif
+#endif
 
 static void mp_factor (mpz_t, struct mp_factors *);
 
@@ -660,7 +651,6 @@ mp_factor_insert_ui (struct mp_factors *factors, unsigned long int prime)
   mp_factor_insert (factors, pz);
   mpz_clear (pz);
 }
-#endif /* HAVE_GMP */
 
 
 /* Number of bits in an uintmax_t.  */
@@ -835,7 +825,6 @@ factor_using_division (uintmax_t *t1p, uintmax_t t1, uintmax_t t0,
   return t0;
 }
 
-#if HAVE_GMP
 static void
 mp_factor_using_division (mpz_t t, struct mp_factors *factors)
 {
@@ -847,7 +836,7 @@ mp_factor_using_division (mpz_t t, struct mp_factors *factors)
   mpz_init (q);
 
   p = mpz_scan1 (t, 0);
-  mpz_div_2exp (t, t, p);
+  mpz_fdiv_q_2exp (t, t, p);
   while (p)
     {
       mp_factor_insert_ui (factors, 2);
@@ -872,7 +861,6 @@ mp_factor_using_division (mpz_t t, struct mp_factors *factors)
 
   mpz_clear (q);
 }
-#endif
 
 /* Entry i contains (2i+1)^(-1) mod 2^8.  */
 static const unsigned char  binvert_table[128] =
@@ -1171,7 +1159,6 @@ millerrabin2 (const uintmax_t *np, uintmax_t ni, const uintmax_t *bp,
   return false;
 }
 
-#if HAVE_GMP
 static bool
 mp_millerrabin (mpz_srcptr n, mpz_srcptr nm1, mpz_ptr x, mpz_ptr y,
                 mpz_srcptr q, unsigned long int k)
@@ -1191,7 +1178,6 @@ mp_millerrabin (mpz_srcptr n, mpz_srcptr nm1, mpz_ptr x, mpz_ptr y,
     }
   return false;
 }
-#endif
 
 /* Lucas' prime test.  The number of iterations vary greatly, up to a few dozen
    have been observed.  The average seem to be about 2.  */
@@ -1377,7 +1363,6 @@ prime2_p (uintmax_t n1, uintmax_t n0)
   abort ();
 }
 
-#if HAVE_GMP
 static bool
 mp_prime_p (mpz_t n)
 {
@@ -1460,7 +1445,6 @@ mp_prime_p (mpz_t n)
 
   return is_prime;
 }
-#endif
 
 static void
 factor_using_pollard_rho (uintmax_t n, unsigned long int a,
@@ -1669,7 +1653,6 @@ factor_using_pollard_rho2 (uintmax_t n1, uintmax_t n0, unsigned long int a,
     }
 }
 
-#if HAVE_GMP
 static void
 mp_factor_using_pollard_rho (mpz_t n, unsigned long int a,
                              struct mp_factors *factors)
@@ -1761,7 +1744,6 @@ mp_factor_using_pollard_rho (mpz_t n, unsigned long int a,
 
   mpz_clears (P, t2, t, z, x, y, NULL);
 }
-#endif
 
 #if USE_SQUFOF
 /* FIXME: Maybe better to use an iteration converging to 1/sqrt(n)?  If
@@ -2251,7 +2233,6 @@ factor (uintmax_t t1, uintmax_t t0, struct factors *factors)
     }
 }
 
-#if HAVE_GMP
 /* Use Pollard-rho to compute the prime factors of
    arbitrary-precision T, and put the results in FACTORS.  */
 static void
@@ -2273,7 +2254,6 @@ mp_factor (mpz_t t, struct mp_factors *factors)
         }
     }
 }
-#endif
 
 static strtol_error
 strto2uintmax (uintmax_t *hip, uintmax_t *lop, const char *s)
@@ -2282,21 +2262,6 @@ strto2uintmax (uintmax_t *hip, uintmax_t *lop, const char *s)
   uintmax_t hi = 0, lo = 0;
 
   strtol_error err = LONGINT_INVALID;
-
-  /* Skip initial spaces and '+'.  */
-  for (;;)
-    {
-      char c = *s;
-      if (c == ' ')
-        s++;
-      else if (c == '+')
-        {
-          s++;
-          break;
-        }
-      else
-        break;
-    }
 
   /* Initial scan for invalid digits.  */
   const char *p = s;
@@ -2315,7 +2280,7 @@ strto2uintmax (uintmax_t *hip, uintmax_t *lop, const char *s)
       err = LONGINT_OK;           /* we've seen at least one valid digit */
     }
 
-  for (;err == LONGINT_OK;)
+  while (err == LONGINT_OK)
     {
       unsigned int c = *s++;
       if (c == 0)
@@ -2498,13 +2463,19 @@ print_factors_single (uintmax_t t1, uintmax_t t0)
 static bool
 print_factors (const char *input)
 {
+  /* Skip initial spaces and '+'.  */
+  char const *str = input;
+  while (*str == ' ')
+    str++;
+  str += *str == '+';
+
   uintmax_t t1, t0;
 
   /* Try converting the number to one or two words.  If it fails, use GMP or
      print an error message.  The 2nd condition checks that the most
      significant bit of the two-word number is clear, in a typesize neutral
      way.  */
-  strtol_error err = strto2uintmax (&t1, &t0, input);
+  strtol_error err = strto2uintmax (&t1, &t0, str);
 
   switch (err)
     {
@@ -2526,29 +2497,28 @@ print_factors (const char *input)
       return false;
     }
 
-#if HAVE_GMP
   devmsg ("[using arbitrary-precision arithmetic] ");
   mpz_t t;
   struct mp_factors factors;
 
-  mpz_init_set_str (t, input, 10);
+  mpz_init_set_str (t, str, 10);
 
-  gmp_printf ("%Zd:", t);
+  mpz_out_str (stdout, 10, t);
+  putchar (':');
   mp_factor (t, &factors);
 
   for (unsigned int j = 0; j < factors.nfactors; j++)
     for (unsigned int k = 0; k < factors.e[j]; k++)
-      gmp_printf (" %Zd", factors.p[j]);
+      {
+        putchar (' ');
+        mpz_out_str (stdout, 10, factors.p[j]);
+      }
 
   mp_factor_clear (&factors);
   mpz_clear (t);
   putchar ('\n');
   fflush (stdout);
   return true;
-#else
-  error (0, 0, _("%s is too large"), quote (input));
-  return false;
-#endif
 }
 
 void

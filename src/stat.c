@@ -1,5 +1,5 @@
 /* stat.c -- display file or file system status
-   Copyright (C) 2001-2020 Free Software Foundation, Inc.
+   Copyright (C) 2001-2021 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -347,6 +347,8 @@ human_fstype (STRUCT_STATVFS const *statfsbuf)
       return "debugfs";
     case S_MAGIC_DEVFS: /* 0x1373 local */
       return "devfs";
+    case S_MAGIC_DEVMEM: /* 0x454D444D local */
+      return "devmem";
     case S_MAGIC_DEVPTS: /* 0x1CD1 local */
       return "devpts";
     case S_MAGIC_DMA_BUF: /* 0x444D4142 local */
@@ -551,6 +553,8 @@ human_fstype (STRUCT_STATVFS const *statfsbuf)
       return "z3fold";
     case S_MAGIC_ZFS: /* 0x2FC12FC1 local */
       return "zfs";
+    case S_MAGIC_ZONEFS: /* 0x5A4F4653 local */
+      return "zonefs";
     case S_MAGIC_ZSMALLOC: /* 0x58295829 local */
       return "zsmallocfs";
 
@@ -1717,10 +1721,10 @@ Display file or file system status.\n\
       fputs (VERSION_OPTION_DESCRIPTION, stdout);
 
       fputs (_("\n\
-The --cached MODE argument can be; always, never, or default.\n\
-`always` will use cached attributes if available, while\n\
-`never` will try to synchronize with the latest attributes, and\n\
-`default` will leave it up to the underlying file system.\n\
+The MODE argument of --cached can be: always, never, or default.\n\
+'always' will use cached attributes if available, while\n\
+'never' will try to synchronize with the latest attributes, and\n\
+'default' will leave it up to the underlying file system.\n\
 "), stdout);
 
       fputs (_("\n\

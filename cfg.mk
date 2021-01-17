@@ -1,5 +1,5 @@
 # Customize maint.mk                           -*- makefile -*-
-# Copyright (C) 2003-2020 Free Software Foundation, Inc.
+# Copyright (C) 2003-2021 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -607,14 +607,6 @@ sc_prohibit_test_backticks:
 sc_prohibit_test_empty:
 	@prohibit='test -s.*&&' in_vc_files='^tests/'			\
 	halt='use `compare /dev/null ...`, not `test -s ...` in tests/'	\
-	  $(_sc_search_regexp)
-
-# Ensure that expr doesn't work directly on various unsigned int types,
-# as that's not generally supported without GMP.
-sc_prohibit_expr_unsigned:
-	@prohibit='expr .*(UINT|ULONG|[^S]SIZE|[UGP]ID|UINTMAX)'	\
-	halt='avoid passing unsigned limits to `expr` (without GMP)'	\
-	in_vc_files='^tests/'						\
 	  $(_sc_search_regexp)
 
 # Programs like sort, ls, expr use PROG_FAILURE in place of EXIT_FAILURE.

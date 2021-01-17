@@ -1,7 +1,7 @@
 #!/bin/sh
-# ls -l /proc/sys would segfault when built against libselinux1 2.0.15-2+b1
+# Validate cksum operation
 
-# Copyright (C) 2008-2020 Free Software Foundation, Inc.
+# Copyright (C) 2020-2021 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,11 +17,19 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
-print_ver_ ls
+print_ver_ cksum printf
 
-f=/proc/sys
-test -r $f || f=.
+returns_ 1 cksum missing || fail=1
 
-ls -l $f > out || fail=1
+{
+  for offset in $(seq -1 6); do
+    env printf $(env printf '\\%03o' $(seq 0 $offset));
+    env printf $(env printf '\\%03o' $(seq 0 255));
+  done
+} > in || framework_failure_
+
+cksum in > out || fail=1
+printf '%s\n' '4097727897 2077 in' > exp || framework_failure_
+compare exp out || fail=1
 
 Exit $fail

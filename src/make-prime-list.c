@@ -3,7 +3,7 @@
    Contributed to the GNU project by Torbjörn Granlund and Niels Möller
    Contains code from GNU MP.
 
-Copyright 2012-2020 Free Software Foundation, Inc.
+Copyright 2012-2021 Free Software Foundation, Inc.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -27,8 +27,9 @@ this program.  If not, see https://www.gnu.org/licenses/.  */
 #include <stdlib.h>
 #include <errno.h>
 
-/* Deactivate config.h's "rpl_"-prefixed definitions of these symbols.  */
+/* Deactivate "rpl_"-prefixed definitions of these symbols.  */
 #undef fclose
+#undef free
 #undef malloc
 #undef strerror
 

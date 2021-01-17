@@ -9,27 +9,64 @@ GNU coreutils NEWS                                    -*- outline -*-
   is a non regular file.
   [bug introduced in coreutils-8.6]
 
+  csplit --suppress-matched now elides the last matched line
+  when a specific number of pattern matches are performed.
+  [bug introduced with the --suppress-matched feature in coreutils-8.22]
+
   du no longer crashes on XFS file systems when the directory hierarchy is
   heavily changed during the run.
   [bug introduced in coreutils-8.25]
+
+  ls no longer crashes when printing the SELinux context for unstatable files.
+  [bug introduced in coreutils-6.9.91]
+
+  mkdir -m no longer mishandles modes more generous than the umask.
+  [bug introduced in coreutils-8.22]
+
+  nl now handles single character --section-delimiter arguments,
+  by assuming a second ':' character has been specified, as specified by POSIX.
+  [This bug was present in "the beginning".]
+
+  rm no longer skips an extra file when the removal of an empty directory fails.
+  [bug introduced by the rewrite to use fts in coreutils-8.0]
+
+  tr no longer crashes when using --complement with certain
+  invalid combinations of case character classes.
+  [bug introduced in coreutils-8.6]
 
 ** Changes in behavior
 
   cp and install now default to copy-on-write (COW) if available.
 
-  On GNU/Linux systems, ls no longer issues an error message on
+  cp, install and mv now use the copy_file_range syscall if available.
+  Also, they prefer lseek+SEEK_HOLE to ioctl+FS_IOC_FIEMAP on sparse
+  files, as lseek is simpler and more portable.
+
+  On GNU/Linux systems, ls no longer issues an error message on a
   directory merely because it was removed.  This reverts a change
   that was made in release 8.32.
 
 ** New Features
 
-   ls --classify now supports the "always", "auto", or "never" flags,
-   to support only outputting classifier characters if connected to a tty.
+  expr and factor now support bignums on all platforms.
+
+  ls --classify now supports the "always", "auto", or "never" flags,
+  to support only outputting classifier characters if connected to a tty.
+
+  nl --line-increment can now take a negative number to decrement the count.
 
 ** Improvements
 
-  stat and tail now know about the "vboxsf" file system type.
-  stat -f -c%T now reports the file system type, and tail -f uses polling.
+  cksum is now up to 4 times faster by using a slice by 8 algorithm.
+
+  df now recognizes these file systems as remote:
+  acfs, coda, fhgfs, gpfs, ibrix, ocfs2, and vxfs.
+
+  stat and tail now know about the "devmem", "vboxsf", and "zonefs"
+  file system types.  stat -f -c%T now reports the file system type,
+  and tail -f uses polling for "vboxsf" and inotify for the others.
+
+  timeout now supports sub-second timeouts on macOS.
 
 
 * Noteworthy changes in release 8.32 (2020-03-05) [stable]
@@ -5177,7 +5214,7 @@ packages, see ./old/*/NEWS.
 
 ========================================================================
 
-Copyright (C) 2001-2020 Free Software Foundation, Inc.
+Copyright (C) 2001-2021 Free Software Foundation, Inc.
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.3 or

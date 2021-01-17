@@ -1,5 +1,5 @@
 /* tail -- output the last part of file(s)
-   Copyright (C) 1989-2020 Free Software Foundation, Inc.
+   Copyright (C) 1989-2021 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1771,7 +1771,7 @@ tail_forever_inotify (int wd, struct File_spec *f, size_t n_files,
               if (0 <= fspec->wd)
                 {
                   inotify_rm_watch (wd, fspec->wd);
-                  hash_delete (wd_to_name, fspec);
+                  hash_remove (wd_to_name, fspec);
                 }
 
               fspec->wd = new_wd;
@@ -1782,7 +1782,7 @@ tail_forever_inotify (int wd, struct File_spec *f, size_t n_files,
               /* If the file was moved then inotify will use the source file wd
                 for the destination file.  Make sure the key is not present in
                 the table.  */
-              struct File_spec *prev = hash_delete (wd_to_name, fspec);
+              struct File_spec *prev = hash_remove (wd_to_name, fspec);
               if (prev && prev != fspec)
                 {
                   if (follow_mode == Follow_name)
@@ -1817,7 +1817,7 @@ tail_forever_inotify (int wd, struct File_spec *f, size_t n_files,
           if (ev->mask & IN_DELETE_SELF)
             {
               inotify_rm_watch (wd, fspec->wd);
-              hash_delete (wd_to_name, fspec);
+              hash_remove (wd_to_name, fspec);
             }
 
           /* Note we get IN_ATTRIB for unlink() as st_nlink decrements.
@@ -2478,10 +2478,6 @@ main (int argc, char **argv)
          Note if there is a change to the original file then we'll
          recheck it and follow the new file, or ignore it if the
          file has changed to being remote.
-
-         FIXME: when using inotify, and a directory for a watched file
-         is recreated, then we don't recheck any new file when
-         follow_mode == Follow_name.
 
          FIXME-maybe: inotify has a watch descriptor per inode, and hence with
          our current hash implementation will only --follow data for one

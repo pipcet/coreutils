@@ -1,5 +1,5 @@
 /* runcon -- run command with specified security context
-   Copyright (C) 2005-2020 Free Software Foundation, Inc.
+   Copyright (C) 2005-2021 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -93,7 +93,6 @@ With neither CONTEXT nor COMMAND, print the current security context.\n\
   -u, --user=USER    user identity\n\
   -r, --role=ROLE    role\n\
   -l, --range=RANGE  levelrange\n\
-\n\
 "), stdout);
       fputs (HELP_OPTION_DESCRIPTION, stdout);
       fputs (VERSION_OPTION_DESCRIPTION, stdout);

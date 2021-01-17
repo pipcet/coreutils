@@ -1,5 +1,5 @@
 /* Base64, base32, and similar encoding/decoding strings or files.
-   Copyright (C) 2004-2020 Free Software Foundation, Inc.
+   Copyright (C) 2004-2021 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -142,7 +142,6 @@ Base%d encode or decode FILE, or standard input, to standard output.\n\
   -i, --ignore-garbage  when decoding, ignore non-alphabet characters\n\
   -w, --wrap=COLS       wrap encoded lines after COLS character (default 76).\n\
                           Use 0 to disable line wrapping\n\
-\n\
 "), stdout);
 #if BASE_TYPE == 42
       fputs (_("\
