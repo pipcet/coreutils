@@ -180,15 +180,13 @@ main (int argc, char **argv)
   struct prime *prime_list;
   unsigned nprimes;
 
-  fprintf (stderr, "Usage: %s LIMIT\n"
-	   "Produces a list of odd primes <= LIMIT\n", argv[0]);
-  fprintf (stderr, "argc %d\n", argc);
   if (argc != 2)
     {
+      fprintf (stderr, "Usage: %s LIMIT\n"
+               "Produces a list of odd primes <= LIMIT\n", argv[0]);
       return EXIT_FAILURE;
     }
   limit = atoi (argv[1]);
-  fprintf (stderr, "limit %d\n", limit);
   if (limit < 3)
     return EXIT_SUCCESS;
 
@@ -218,7 +216,6 @@ main (int argc, char **argv)
         ;
     }
 
-  fprintf (stderr, "output_primes\n", limit);
   output_primes (prime_list, nprimes);
 
   free (sieve);
@@ -230,6 +227,5 @@ main (int argc, char **argv)
       return EXIT_FAILURE;
     }
 
-  fprintf (stderr, "success\n", limit);
   return EXIT_SUCCESS;
 }
