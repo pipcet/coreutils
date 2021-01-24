@@ -180,10 +180,10 @@ main (int argc, char **argv)
   struct prime *prime_list;
   unsigned nprimes;
 
+  fprintf (stderr, "Usage: %s LIMIT\n"
+	   "Produces a list of odd primes <= LIMIT\n", argv[0]);
   if (argc != 2)
     {
-      fprintf (stderr, "Usage: %s LIMIT\n"
-               "Produces a list of odd primes <= LIMIT\n", argv[0]);
       return EXIT_FAILURE;
     }
   limit = atoi (argv[1]);
