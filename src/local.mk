@@ -494,7 +494,7 @@ $(top_srcdir)/src/primes.h:
 	$(AM_V_at)${MKDIR_P} src
 	$(MAKE) src/make-prime-list$(EXEEXT)
 	$(AM_V_GEN)rm -f $@ $@-t
-	$(AM_V_at)src/make-prime-list$(EXEEXT) 5000 > $@-t
+	$(AM_V_at)src/make-prime-list$(EXEEXT) 5000 | tee $@-t
 	$(AM_V_at)chmod a-w $@-t
 	$(AM_V_at)mv $@-t $@
 
