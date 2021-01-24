@@ -182,6 +182,7 @@ main (int argc, char **argv)
 
   fprintf (stderr, "Usage: %s LIMIT\n"
 	   "Produces a list of odd primes <= LIMIT\n", argv[0]);
+  fprintf (stderr, "argc %d\n", argc);
   if (argc != 2)
     {
       return EXIT_FAILURE;
