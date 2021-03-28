@@ -17,6 +17,9 @@ GNU coreutils NEWS                                    -*- outline -*-
   heavily changed during the run.
   [bug introduced in coreutils-8.25]
 
+  env -S no longer crashes when given unusual whitespace characters
+  [bug introduced in coreutils-8.30]
+
   expr no longer mishandles unmatched \(...\) in regular expressions.
   [bug introduced in coreutils-6.0]
 
@@ -56,6 +59,10 @@ GNU coreutils NEWS                                    -*- outline -*-
   directory merely because it was removed.  This reverts a change
   that was made in release 8.32.
 
+  ptx -T no longer attempts to substitute old-fashioned TeX escapes
+  for 8-bit non-ASCII alphabetic characters.  TeX indexes should
+  instead use '\usepackage[latin1]{inputenc}' or equivalent.
+
 ** New Features
 
   expr and factor now support bignums on all platforms.
@@ -70,7 +77,9 @@ GNU coreutils NEWS                                    -*- outline -*-
   cat --show-ends will now show \r\n as ^M$.  Previously the \r was taken
   literally, thus overwriting the first character in the line with '$'.
 
-  cksum is now up to 4 times faster by using a slice by 8 algorithm.
+  cksum is now up to 4 times faster by using a slice by 8 algorithm,
+  and at least 8 times faster where pclmul instructions are supported.
+  A new --debug option will indicate if pclmul is being used.
 
   df now recognizes these file systems as remote:
   acfs, coda, fhgfs, gpfs, ibrix, ocfs2, and vxfs.

@@ -39,6 +39,7 @@
 
 #define AUTHORS proper_name ("Q. Frank Xia")
 
+#include <getopt.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdint.h>
@@ -122,7 +123,7 @@ main (void)
         }
     }
 
-  printf ("static uint_fast32_t const crctab[8][256] = {\n");
+  printf ("uint_fast32_t const crctab[8][256] = {\n");
   for (int y = 0; y < 8; y++)
     {
       printf ("{\n  0x%08x", crctab[y][0]);
@@ -141,17 +142,126 @@ main (void)
 
 #else /* !CRCTAB */
 
-# include "long-options.h"
 # include "die.h"
 # include "error.h"
 
 # include "cksum.h"
+# if USE_PCLMUL_CRC32
+#  include "cpuid.h"
+# endif /* USE_PCLMUL_CRC32 */
 
 /* Number of bytes to read at once.  */
 # define BUFLEN (1 << 16)
 
+static bool debug;
+
+enum
+{
+  DEBUG_PROGRAM_OPTION = CHAR_MAX + 1,
+};
+
+static struct option const longopts[] =
+{
+  {"debug", no_argument, NULL, DEBUG_PROGRAM_OPTION},
+  {GETOPT_HELP_OPTION_DECL},
+  {GETOPT_VERSION_OPTION_DECL},
+  {NULL, 0, NULL, 0},
+};
+
 /* Nonzero if any of the files read were the standard input. */
 static bool have_read_stdin;
+
+static bool
+cksum_slice8 (FILE *fp, const char *file, uint_fast32_t *crc_out,
+              uintmax_t *length_out);
+static bool
+  (*cksum_fp)(FILE *, const char *, uint_fast32_t *,
+              uintmax_t *) = cksum_slice8;
+
+# if USE_PCLMUL_CRC32
+static bool
+pclmul_supported (void)
+{
+  unsigned int eax = 0;
+  unsigned int ebx = 0;
+  unsigned int ecx = 0;
+  unsigned int edx = 0;
+
+  if (! __get_cpuid (1, &eax, &ebx, &ecx, &edx))
+    {
+      if (debug)
+        error (0, 0, "%s", _("failed to get cpuid"));
+      return false;
+    }
+
+  if (! (ecx & bit_PCLMUL) || ! (ecx & bit_AVX))
+    {
+      if (debug)
+        error (0, 0, "%s", _("pclmul support not detected"));
+      return false;
+    }
+
+  if (debug)
+    error (0, 0, "%s", _("using pclmul hardware support"));
+
+  return true;
+}
+# endif /* USE_PCLMUL_CRC32 */
+
+static bool
+cksum_slice8 (FILE *fp, const char *file, uint_fast32_t *crc_out,
+              uintmax_t *length_out)
+{
+  uint32_t buf[BUFLEN/sizeof (uint32_t)];
+  uint_fast32_t crc = 0;
+  uintmax_t length = 0;
+  size_t bytes_read;
+
+  if (!fp || !file || !crc_out || !length_out)
+    return false;
+
+  while ((bytes_read = fread (buf, 1, BUFLEN, fp)) > 0)
+    {
+      uint32_t *datap;
+
+      if (length + bytes_read < length)
+        {
+          error (0, EOVERFLOW, _("%s: file too long"), quotef (file));
+          return false;
+        }
+      length += bytes_read;
+
+      /* Process multiples of 8 bytes */
+      datap = (uint32_t *)buf;
+      while (bytes_read >= 8)
+        {
+          uint32_t first = *datap++, second = *datap++;
+          crc ^= SWAP (first);
+          second = SWAP (second);
+          crc = (crctab[7][(crc >> 24) & 0xFF]
+                 ^ crctab[6][(crc >> 16) & 0xFF]
+                 ^ crctab[5][(crc >> 8) & 0xFF]
+                 ^ crctab[4][(crc) & 0xFF]
+                 ^ crctab[3][(second >> 24) & 0xFF]
+                 ^ crctab[2][(second >> 16) & 0xFF]
+                 ^ crctab[1][(second >> 8) & 0xFF]
+                 ^ crctab[0][(second) & 0xFF]);
+          bytes_read -= 8;
+        }
+
+      /* And finish up last 0-7 bytes in a byte by byte fashion */
+      unsigned char *cp = (unsigned char *)datap;
+      while (bytes_read--)
+        crc = (crc << 8) ^ crctab[0][((crc >> 24) ^ *cp++) & 0xFF];
+      if (feof (fp))
+        break;
+    }
+
+  *crc_out = crc;
+  *length_out = length;
+
+  return true;
+}
 
 /* Calculate and print the checksum and length in bytes
    of file FILE, or of the standard input if FILE is "-".
@@ -161,10 +271,8 @@ static bool have_read_stdin;
 static bool
 cksum (const char *file, bool print_name)
 {
-  uint32_t buf[BUFLEN/sizeof (uint32_t)];
   uint_fast32_t crc = 0;
   uintmax_t length = 0;
-  size_t bytes_read;
   FILE *fp;
   char length_buf[INT_BUFSIZE_BOUND (uintmax_t)];
   char const *hp;
@@ -187,39 +295,8 @@ cksum (const char *file, bool print_name)
 
   fadvise (fp, FADVISE_SEQUENTIAL);
 
-  while ((bytes_read = fread (buf, 1, BUFLEN, fp)) > 0)
-    {
-      uint32_t *datap;
-      uint32_t second = 0;
-
-      if (length + bytes_read < length)
-        die (EXIT_FAILURE, 0, _("%s: file too long"), quotef (file));
-      length += bytes_read;
-
-      /* Process multiples of 8 bytes */
-      datap = (uint32_t *)buf;
-      while (bytes_read >= 8)
-        {
-           crc ^= SWAP (*(datap++));
-           second = SWAP (*(datap++));
-           crc =   crctab[7][(crc >> 24) & 0xFF]
-                 ^ crctab[6][(crc >> 16) & 0xFF]
-                 ^ crctab[5][(crc >> 8) & 0xFF]
-                 ^ crctab[4][(crc) & 0xFF]
-                 ^ crctab[3][(second >> 24) & 0xFF]
-                 ^ crctab[2][(second >> 16) & 0xFF]
-                 ^ crctab[1][(second >> 8) & 0xFF]
-                 ^ crctab[0][(second) & 0xFF];
-           bytes_read -= 8;
-        }
-
-      /* And finish up last 0-7 bytes in a byte by byte fashion */
-      unsigned char *cp = (unsigned char *)datap;
-      while (bytes_read--)
-        crc = (crc << 8) ^ crctab[0][((crc >> 24) ^ *cp++) & 0xFF];
-      if (feof (fp))
-        break;
-    }
+  if (! cksum_fp (fp, file, &crc, &length))
+    return false;
 
   if (ferror (fp))
     {
@@ -279,7 +356,7 @@ Print CRC checksum and byte counts of each FILE.\n\
 int
 main (int argc, char **argv)
 {
-  int i;
+  int i, c;
   bool ok;
 
   initialize_main (&argc, &argv);
@@ -294,10 +371,29 @@ main (int argc, char **argv)
      so that processes running in parallel do not intersperse their output.  */
   setvbuf (stdout, NULL, _IOLBF, 0);
 
-  parse_gnu_standard_options_only (argc, argv, PROGRAM_NAME, PACKAGE, Version,
-                                   true, usage, AUTHORS, (char const *) NULL);
+  while ((c = getopt_long (argc, argv, "", longopts, NULL)) != -1)
+    {
+      switch (c)
+        {
+        case DEBUG_PROGRAM_OPTION:
+          debug = true;
+          break;
+
+        case_GETOPT_HELP_CHAR;
+
+        case_GETOPT_VERSION_CHAR (PROGRAM_NAME, AUTHORS);
+
+        default:
+          usage (EXIT_FAILURE);
+        }
+    }
 
   have_read_stdin = false;
+
+# if USE_PCLMUL_CRC32
+  if (pclmul_supported ())
+     cksum_fp = cksum_pclmul;
+# endif /* USE_PCLMUL_CRC32 */
 
   if (optind == argc)
     ok = cksum ("-", false);
